@@ -112,20 +112,21 @@ visualise_cameras(vertices, edges, cam_in_world_orientations, cam_in_world_locat
 keypoints = cell(num_files,1); 
 descriptors = cell(num_files,1); 
 
-for i=1:length(Filenames)
-    fprintf('Calculating sift features for image: %d \n', i)
-
-%    TODO: Prepare the image (img) for vl_sift() function
-    [keypoints{i}, descriptors{i}] = vl_sift(img) ;
-end
+% for i=1:length(Filenames)
+%     fprintf('Calculating sift features for image: %d \n', i)
+%
+% %    TODO: Prepare the image (img) for vl_sift() function
+%     img = single(rgb2gray(imread(Filenames{i})));
+%     [keypoints{i}, descriptors{i}] = vl_sift(img) ;
+% end
 
 % When you rerun the code, you can load sift features and descriptors to
 
 % Save sift features and descriptors and load them when you rerun the code to save time
-save('sift_descriptors.mat', 'descriptors')
-save('sift_keypoints.mat', 'keypoints')
-% load('sift_descriptors.mat');
-% load('sift_keypoints.mat');
+% save('sift_descriptors.mat', 'descriptors')
+% save('sift_keypoints.mat', 'keypoints')
+load('sift_descriptors.mat');
+load('sift_keypoints.mat');
 
 
 % Visualisation of sift features for the first image
