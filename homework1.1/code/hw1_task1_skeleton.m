@@ -239,7 +239,7 @@ for i=1:num_files
     end
 end
 model.coord3d = rmmissing(model.coord3d);
-model.descriptors = rmmissing(model.descriptors);
+model.descriptors = rmmissing(model.descriptors, 2);
 
 scatter3(model.coord3d(:,1), model.coord3d(:,2), model.coord3d(:,3), '.', 'g');
 hold off
