@@ -169,10 +169,8 @@ fig = visualise_cameras(vertices, edges, cam_in_world_orientations, cam_in_world
 hold on
 
 % Place model's SIFT keypoints coordinates and descriptors here
-model.coord3d = [];
-model.descriptors = [];
-model.coord3d = NaN(size_total_sift_points, 3);
-model.descriptors = NaN(128, size_total_sift_points);
+model.coord3d = zeros(size_total_sift_points, 3);
+model.descriptors = zeros(128, size_total_sift_points, 'uint8');
 points_found = 0;
 
 for i=1:num_files
@@ -238,8 +236,8 @@ for i=1:num_files
         end
     end
 end
-model.coord3d = rmmissing(model.coord3d);
-model.descriptors = rmmissing(model.descriptors, 2);
+model.coord3d = model.coord3d(1:points_found, :);
+model.descriptors = model.descriptors(:, 1:points_found);
 
 scatter3(model.coord3d(:,1), model.coord3d(:,2), model.coord3d(:,3), '.', 'g');
 hold off
