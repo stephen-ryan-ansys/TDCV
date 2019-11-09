@@ -27,12 +27,12 @@ title('Vertices numbering')
 % will result in NaN values in the output array
 % Don't forget to filter NaNs later
 num_points = 8;
-labeled_points = mark_image(path_img_dir, num_points);
+% labeled_points = mark_image(path_img_dir, num_points);
 
 
 % Save labeled points and load them when you rerun the code to save time
-save('labeled_points.mat', 'labeled_points')
-% load('labeled_points.mat')
+% save('labeled_points.mat', 'labeled_points')
+load('labeled_points.mat')
 
 %% Get all filenames in images folder
 
@@ -72,11 +72,27 @@ for i=1:num_files
 %   TODO: Estimate camera pose for every image
 %     In order to estimate pose of the camera using the function bellow you need to:
 %   - Prepare image_points and corresponding world_points
+    [image_points, removed] = rmmissing(labeled_points(:, :, i));
+    world_points = vertices(~removed, :);
 %   - Setup camera_params using cameraParameters() function
+    % focal lengths (square pixels since fx = fy):
+    fx = 2960.37845;
+    fy = fx;
+    % optical center:
+    cx = 1841.68855;
+    cy = 1235.23369;
+    % axis skew:
+    s = 0;
+    intrinsic_matrix = [
+        fx,  0,  0;
+         s, fy,  0;
+        cx, cy,  1;
+    ];
+    camera_params = cameraParameters('IntrinsicMatrix', intrinsic_matrix);
 %   - Define max_reproj_err - take a look at the documentation and
 %   experiment with different values of this parameter 
+    max_reproj_err = 4;
     [cam_in_world_orientations(:,:,i),cam_in_world_locations(:,:,i)] = estimateWorldCameraPose(image_points, world_points, camera_params, 'MaxReprojectionError', max_reproj_err);
-    
 end
 
 %% Visualize computed camera poses
