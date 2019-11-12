@@ -173,6 +173,11 @@ model.coord3d = zeros(size_total_sift_points, 3);
 model.descriptors = zeros(128, size_total_sift_points, 'uint8');
 points_found = 0;
 
+% setup vertices for TriangleRayIntersection
+vert1 = vertices(faces(:, 1) + 1, :);
+vert2 = vertices(faces(:, 2) + 1, :);
+vert3 = vertices(faces(:, 3) + 1, :);
+
 for i=1:num_files
     
 %     Randomly select a number of SIFT keypoints
@@ -184,20 +189,6 @@ for i=1:num_files
     Q = P(:,1:3);
     q = P(:,4);
     orig = -inv(Q)*q; % this corresponds to C
-
-    % setup vertices for TriangleRayIntersection
-    num_faces = size(faces, 1);
-    vert1 = zeros(num_faces, 3);
-    vert2 = zeros(num_faces, 3);
-    vert3 = zeros(num_faces, 3);
-    for k = 1:num_faces
-        face = faces(k, :);
-        % +1 because indices start at 1
-        triangle = vertices(face + 1, :);
-        vert1(k, :) = triangle(1, :);
-        vert2(k, :) = triangle(2, :);
-        vert3(k, :) = triangle(3, :);
-    end
 
     m = ones(3, 1);
     for j=1:num_samples
