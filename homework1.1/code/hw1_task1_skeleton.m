@@ -95,7 +95,7 @@ for i=1:num_files
     );
 %   - Define max_reproj_err - take a look at the documentation and
 %   experiment with different values of this parameter 
-    max_reproj_err = 4;
+    max_reproj_err = 2;
     [cam_in_world_orientations(:,:,i),cam_in_world_locations(:,:,i)] = estimateWorldCameraPose(image_points, world_points, camera_params, 'MaxReprojectionError', max_reproj_err);
 end
 
@@ -131,7 +131,6 @@ descriptors = cell(num_files,1);
 % save('sift_keypoints.mat', 'keypoints')
 load('sift_descriptors.mat');
 load('sift_keypoints.mat');
-
 
 % Visualisation of sift features for the first image
 figure()
@@ -173,6 +172,11 @@ model.coord3d = zeros(size_total_sift_points, 3);
 model.descriptors = zeros(128, size_total_sift_points, 'uint8');
 points_found = 0;
 
+% setup vertices for TriangleRayIntersection
+vert1 = vertices(faces(:, 1) + 1, :);
+vert2 = vertices(faces(:, 2) + 1, :);
+vert3 = vertices(faces(:, 3) + 1, :);
+
 for i=1:num_files
     
 %     Randomly select a number of SIFT keypoints
@@ -184,20 +188,6 @@ for i=1:num_files
     Q = P(:,1:3);
     q = P(:,4);
     orig = -inv(Q)*q; % this corresponds to C
-
-    % setup vertices for TriangleRayIntersection
-    num_faces = size(faces, 1);
-    vert1 = zeros(num_faces, 3);
-    vert2 = zeros(num_faces, 3);
-    vert3 = zeros(num_faces, 3);
-    for k = 1:num_faces
-        face = faces(k, :);
-        % +1 because indices start at 1
-        triangle = vertices(face + 1, :);
-        vert1(k, :) = triangle(1, :);
-        vert2(k, :) = triangle(2, :);
-        vert3(k, :) = triangle(3, :);
-    end
 
     m = ones(3, 1);
     for j=1:num_samples
@@ -255,3 +245,26 @@ axis equal;
 xlabel('x');
 ylabel('y');
 zlabel('z');
+
+%% Test to see if they align after projection
+for i = 1:num_files
+    P = camera_params.IntrinsicMatrix.'*[cam_in_world_orientations(:,:,i) -cam_in_world_orientations(:,:,i)*cam_in_world_locations(:,:,i).'];
+    temp_coord3d = model.coord3d;
+    temp_coord3d(:, 4) = 1;
+    uv = P*temp_coord3d';
+    uv = uv(1:2, :)./uv(3, :);
+
+    img = imread(Filenames{i});
+    figure();
+    imshow(img);
+    drawnow;
+    hold on
+    scatter(uv(1, :), uv(2, :), '.', 'g');
+end
+
+%% Save the P matrices
+P_task1 = zeros(3, 4, num_files);
+for i = 1:num_files
+    P_task1(:, :, i) = camera_params.IntrinsicMatrix.'*[cam_in_world_orientations(:,:,i) -cam_in_world_orientations(:,:,i)*cam_in_world_locations(:,:,i).'];
+end
+save('cam_matrices.mat', 'P_task1');
