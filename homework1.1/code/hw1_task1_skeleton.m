@@ -198,8 +198,7 @@ for i=1:num_files
         m(1:2) = keypoints{i}(1:2, sel(j));
 %         lambda = norm(m(1:2));
 %         ray = orig + lambda*Q\m;
-        ray = orig + Q\m;
-        ray = ray/norm(ray);
+        ray = Q\m;
         [intersect, t, u, v, xcoor] = TriangleRayIntersection(...
             orig',...
             ray',...
