@@ -203,7 +203,8 @@ for i=1:num_files
             orig',...
             ray',...
             vert1, vert2, vert3,...
-            'planeType', 'one sided'... % necessary to ignore occluded faces
+            'planeType', 'one sided',... % necessary to ignore occluded faces
+            'border', 'inclusive'... % include intersections on borders
         );
         % should be only one intersection because 'one_sided'
         if any(size(find(intersect)) > 1)

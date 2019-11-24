@@ -179,9 +179,10 @@ edges = [[1, 1, 1, 2, 2, 3, 3, 4, 5, 5, 6, 7]
 
 for i=1:num_files
 
-    figure()
+    fh = figure();
     imshow(char(Filenames(i)), 'InitialMagnification', 'fit');
     title(sprintf('Image: %d', i))
+    fh.WindowState = 'maximized';
     hold on
 
 %   Plot inliers set
