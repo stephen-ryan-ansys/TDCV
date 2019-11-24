@@ -25,6 +25,7 @@ for i=1:num_files
     img_data = imread(fullfile(path, img_files(i).name));
     fig = figure;
     image(img_data);
+    zoom(2);
     hold on;
     
     for j=1:max_points

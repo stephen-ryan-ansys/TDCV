@@ -95,7 +95,7 @@ for i=1:num_files
     );
 %   - Define max_reproj_err - take a look at the documentation and
 %   experiment with different values of this parameter 
-    max_reproj_err = 4;
+    max_reproj_err = 2;
     [cam_in_world_orientations(:,:,i),cam_in_world_locations(:,:,i)] = estimateWorldCameraPose(image_points, world_points, camera_params, 'MaxReprojectionError', max_reproj_err);
 end
 
@@ -131,7 +131,6 @@ descriptors = cell(num_files,1);
 % save('sift_keypoints.mat', 'keypoints')
 load('sift_descriptors.mat');
 load('sift_keypoints.mat');
-
 
 % Visualisation of sift features for the first image
 figure()
@@ -199,13 +198,13 @@ for i=1:num_files
         m(1:2) = keypoints{i}(1:2, sel(j));
 %         lambda = norm(m(1:2));
 %         ray = orig + lambda*Q\m;
-        ray = orig + Q\m;
-        ray = ray/norm(ray);
+        ray = Q\m;
         [intersect, t, u, v, xcoor] = TriangleRayIntersection(...
             orig',...
             ray',...
             vert1, vert2, vert3,...
-            'planeType', 'one sided'... % necessary to ignore occluded faces
+            'planeType', 'one sided',... % necessary to ignore occluded faces
+            'border', 'inclusive'... % include intersections on borders
         );
         % should be only one intersection because 'one_sided'
         if any(size(find(intersect)) > 1)
@@ -246,3 +245,26 @@ axis equal;
 xlabel('x');
 ylabel('y');
 zlabel('z');
+
+%% Test to see if they align after projection
+for i = 1:num_files
+    P = camera_params.IntrinsicMatrix.'*[cam_in_world_orientations(:,:,i) -cam_in_world_orientations(:,:,i)*cam_in_world_locations(:,:,i).'];
+    temp_coord3d = model.coord3d;
+    temp_coord3d(:, 4) = 1;
+    uv = P*temp_coord3d';
+    uv = uv(1:2, :)./uv(3, :);
+
+    img = imread(Filenames{i});
+    figure();
+    imshow(img);
+    drawnow;
+    hold on
+    scatter(uv(1, :), uv(2, :), '.', 'g');
+end
+
+%% Save the P matrices
+P_task1 = zeros(3, 4, num_files);
+for i = 1:num_files
+    P_task1(:, :, i) = camera_params.IntrinsicMatrix.'*[cam_in_world_orientations(:,:,i) -cam_in_world_orientations(:,:,i)*cam_in_world_locations(:,:,i).'];
+end
+save('cam_matrices.mat', 'P_task1');
