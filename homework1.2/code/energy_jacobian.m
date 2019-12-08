@@ -1,4 +1,4 @@
-function J = energy_jacobian(camera_params, R, t, M)
+function J = energy_jacobian(camera_params, R, t, M, check_jacobian)
 N = size(M, 1);
 J = zeros(2*N, 6);
 
@@ -23,7 +23,18 @@ for k = 1:N
     W = proj(k, 3);
     dm = [1/W,   0, -U/W^2;
             0, 1/W, -V/W^2];
-    J((2*k-1):(2*k), :) = dm*camera_params.IntrinsicMatrix'*dM;
+    J_analytic = dm*camera_params.IntrinsicMatrix'*dM;
+    if check_jacobian
+        J_symbolic = symbolic_jacobian(M(k, 1), M(k, 2), M(k, 3),...
+                                       t(1), t(2), t(3),...
+                                       v(1), v(2), v(3));
+        J_diff = abs(J_symbolic - J_analytic);
+        equal = all(J_diff(:) < 1e-10);
+        if ~equal
+            fprintf('Analytic jacobian is off by %e at point %d\n', max(J_diff(:)), k);
+        end
+    end
+    J((2*k-1):(2*k), :) = J_analytic;
 end
 end
 

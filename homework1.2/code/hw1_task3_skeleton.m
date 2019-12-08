@@ -155,6 +155,11 @@ hold off;
 % We suggest you to validate the correctness of the Jacobian implementation
 % either using Symbolic toolbox or finite differences approach
 
+check_jacobians = 1;
+% if check_jacobians
+%     create_symbolic_jacobian(intrinsic_matrix');
+% end
+
 threshold_ubcmatch = 6; % matching threshold for vl_ubcmatch()
 
 % setup vertices for TriangleRayIntersection
@@ -222,7 +227,7 @@ for i = 1:(num_files - 1)
     lambda = 0.001;
     u = threshold_irls + 1;
     % calculate Jacobian as in the slides:
-    J = energy_jacobian(camera_params, R, t, M);
+    J = energy_jacobian(camera_params, R, t, M, check_jacobians);
 
     while (n < N && u > threshold_irls)
         % calculate energy
@@ -241,7 +246,7 @@ for i = 1:(num_files - 1)
             theta = updated_theta;
             R = updated_R;
             t = updated_t;
-            J = energy_jacobian(camera_params, R, t, M);
+            J = energy_jacobian(camera_params, R, t, M, check_jacobians);
         end
 
         u = norm(delta);
