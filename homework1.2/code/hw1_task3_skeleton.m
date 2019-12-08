@@ -303,4 +303,8 @@ end
 % approximately less than 1cm
 
 % TODO: Estimate ATE and RPE for validation and test sequences
-
+frames = 6:30;
+save_trajectory('pred_valid.txt', frames, cam_in_world_orientations, cam_in_world_locations);
+% then run:
+%../../../rgbd_benchmark_tools/scripts/evaluate_ate.py --plot ate_trajectory_plot.png --verbose gt_valid.txt pred_valid.txt
+%../../../rgbd_benchmark_tools/scripts/evaluate_rpe.py --fixed_delta --delta_unit f --plot rte_trajectory_plot.png --verbose gt_valid.txt pred_valid.txt
