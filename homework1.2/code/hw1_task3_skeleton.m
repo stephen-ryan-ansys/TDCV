@@ -102,7 +102,7 @@ load('image_points.mat');
 [image_points, removed] = rmmissing(image_points(:, :));
 world_points = vertices(~removed, :);
 
-% TODO: Estimate camera position for the first image
+% Estimate camera position for the first image
 [init_orientation, init_location] = estimateWorldCameraPose(image_points, world_points, camera_params, 'MaxReprojectionError', 2);
 
 cam_in_world_orientations(:,:, 1) = init_orientation;
@@ -162,86 +162,95 @@ vert1 = vertices(faces(:, 1) + 1, :);
 vert2 = vertices(faces(:, 2) + 1, :);
 vert3 = vertices(faces(:, 3) + 1, :);
 
-% for i = 1:(num_files - 1)
-i = 1;
+for i = 1:(num_files - 1)
+    % 1) Back-project initial frame to get 3D coords:
+    size_total_sift_points = size(keypoints{i}, 2);
+    model.coord3d = zeros(size_total_sift_points, 3);
+    model.descriptors = zeros(128, size_total_sift_points, 'uint8');
+    points_found = 0;
 
-% 1) Back-project initial frame to get 3D coords:
-size_total_sift_points = size(keypoints{i}, 2);
-model.coord3d = zeros(size_total_sift_points, 3);
-model.descriptors = zeros(128, size_total_sift_points, 'uint8');
-points_found = 0;
+    m = ones(3, 1);
+    P = camera_params.IntrinsicMatrix.'*[cam_in_world_orientations(:,:,i) -cam_in_world_orientations(:,:,i)*cam_in_world_locations(:,:,i).'];
+    Q = P(:,1:3);
+    q = P(:,4);
+    orig = -inv(Q)*q;
 
-m = ones(3, 1);
-P = camera_params.IntrinsicMatrix.'*[cam_in_world_orientations(:,:,i) -cam_in_world_orientations(:,:,i)*cam_in_world_locations(:,:,i).'];
-Q = P(:,1:3);
-q = P(:,4);
-orig = -inv(Q)*q;
-
-for j = 1:size_total_sift_points
-     m(1:2) = keypoints{i}(1:2, j);
-     ray = Q\m;
-     [intersect, ~, ~, ~, xcoor] = TriangleRayIntersection(...
-        orig',...
-        ray',...
-        vert1, vert2, vert3,...
-        'planeType', 'one sided',... % necessary to ignore occluded faces
-        'border', 'inclusive'... % include intersections on borders
-    );
-    if any(intersect)
-        points_found = points_found + 1;
-        idx = find(intersect);
-        M = xcoor(idx, :);
-        model.coord3d(points_found, :) = M;
-        model.descriptors(:, points_found) = descriptors{i}(:, j);
+    for j = 1:size_total_sift_points
+        m(1:2) = keypoints{i}(1:2, j);
+        ray = Q\m;
+        [intersect, ~, ~, ~, xcoor] = TriangleRayIntersection(...
+            orig',...
+            ray',...
+            vert1, vert2, vert3,...
+            'planeType', 'one sided',... % necessary to ignore occluded faces
+            'border', 'inclusive'... % include intersections on borders
+        );
+        if any(intersect)
+            points_found = points_found + 1;
+            idx = find(intersect);
+            M = xcoor(idx, :);
+            model.coord3d(points_found, :) = M(1, :);
+            model.descriptors(:, points_found) = descriptors{i}(:, j);
+        end
     end
+    model.coord3d = model.coord3d(1:points_found, :);
+    model.descriptors = model.descriptors(:, 1:points_found);
+
+    % 2) Find SIFT matches
+    img = single(rgb2gray(imread(Filenames{i+1})));
+    sift_matches = vl_ubcmatch(descriptors{i+1}, model.descriptors, threshold_ubcmatch);
+    image_matches_idx = sift_matches(1, :);
+    model_matches_idx = sift_matches(2, :);
+
+    % Implement IRLS method for the reprojection error optimisation
+    % You can start with these parameters to debug your solution 
+    % but you should also experiment with their different values
+    threshold_irls = 0.000001; % update threshold for IRLS
+    N = 200; % number of iterations
+
+    fprintf('Performing IRLS for image: %d\n', i+1);
+    % 3D reproj from camera i:
+    M = model.coord3d(model_matches_idx, 1:3);
+    % image points from camera i+1:
+    m = keypoints{i+1}(1:2, image_matches_idx)';
+    [R, t] = cameraPoseToExtrinsics(cam_in_world_orientations(:, :, i), cam_in_world_locations(:, :, i));
+    % returned so that [x, y, z] = [X, Y, Z]*R + [t_X, t_Y, t_Z];
+    % so need to use R' later when multiplying from left
+    v = rotationMatrixToVector(R); % exponential coords as row vector
+    theta = [v'; t']; % column vector
+    n = 0; % t in paper
+    lambda = 0.001;
+    u = threshold_irls + 1;
+    % calculate Jacobian as in the slides:
+    J = energy_jacobian(camera_params, R, t, M);
+
+    while (n < N && u > threshold_irls)
+        % calculate energy
+        [E, W, e] = energy_function(camera_params, R, t, M, m);
+
+        delta = -inv(J'*W*J + lambda*eye(6))*(J'*W*e);
+        updated_theta = theta + delta;
+        updated_R = rotationVectorToMatrix(updated_theta(1:3));
+        updated_t = updated_theta(4:6)';
+        [updated_E, ~, ~] = energy_function(camera_params, updated_R, updated_t, M, m);
+
+        if updated_E > E
+            lambda = 10*lambda;
+        else
+            lambda = 0.1*lambda;
+            theta = updated_theta;
+            R = updated_R;
+            t = updated_t;
+            J = energy_jacobian(camera_params, R, t, M);
+        end
+
+        u = norm(delta);
+        n = n + 1;
+    end
+
+    [cam_in_world_orientations(:, :, i+1), cam_in_world_locations(:, :, i+1)] = ...
+        extrinsicsToCameraPose(R, t);
 end
-model.coord3d = model.coord3d(1:points_found, :);
-model.descriptors = model.descriptors(:, 1:points_found);
-
-% 2) Find SIFT matches
-img = single(rgb2gray(imread(Filenames{i+1})));
-sift_matches = vl_ubcmatch(descriptors{i+1}, model.descriptors, threshold_ubcmatch);
-image_matches_idx = sift_matches(1, :);
-model_matches_idx = sift_matches(2, :);
-
-% 3) Project 3D matches to image i+1 using intial guess of camera from image i
-model.coord3d(:, 4) = 1;
-proj = P*model.coord3d(model_matches_idx, :)';
-proj = proj(1:2, :)./proj(3, :);
-
-% 4) Compute the reprojection error
-image_matches = keypoints{i+1}(1:2, image_matches_idx);
-dist = image_matches - proj;
-L2_norms = vecnorm(dist, 2, 1);
-
-% % (DEBUG) Plot the reproj distances:
-% img = imread(Filenames{i+1});
-% figure();
-% imshow(img);
-% drawnow;
-% for j = 1:length(proj)
-%     hold on
-%     quiver(proj(1, j), proj(2, j), dist(1, j), dist(2, j), 0, 'MaxHeadSize', 0.02, 'Color', 'g');
-% end
-
-% 5) Implement IRLS:
-% TODO: Implement IRLS method for the reprojection error optimisation
-% You can start with these parameters to debug your solution 
-% but you should also experiment with their different values
-threshold_irls = 0.005; % update threshold for IRLS
-N = 20; % number of iterations
-fprintf('Performing IRLS for image: %d\n', i+1);
-[R, t] = cameraPoseToExtrinsics(cam_in_world_orientations(:, :, i), cam_in_world_locations(:, :, i));
-u = threshold_irls + 1;
-while (t < N && u > threshold_irls)
-
-
-    % u = ...
-    t = t + 1;
-end
-
-% 6) Next frame
-% end
 
 
 %% Plot camera trajectory in 3D world CS + cameras
