@@ -5,11 +5,27 @@ addpath('helper_functions')
 
 %% Setup
 % path to the images folder
-path_img_dir = '../data/tracking/valid/img';
+
+prompt = 'Validation (0) or test (1)? ';
+test = input(prompt);
+
 % path to object ply file
 object_path = '../data/teabox.ply';
-% path to results folder
-results_path = '../data/tracking/valid/results';
+if test
+     path_img_dir = '../data/tracking/test/img';
+    % path to results folder
+    results_path = '../data/tracking/test/results';
+    sift_descrption_file = 'sift_descriptors_test.mat';
+    sift_keypoints_file = 'sift_keypoints_test.mat';
+    image_points_file = 'image_points_test.mat';
+else
+    path_img_dir = '../data/tracking/valid/img';
+    % path to results folder
+    results_path = '../data/tracking/valid/results';
+    sift_descrption_file = 'sift_descriptors.mat';
+    sift_keypoints_file = 'sift_keypoints.mat';
+    image_points_file = 'image_points.mat';
+end
 
 % Read the object's geometry 
 % Here vertices correspond to object's corners and faces are triangles
@@ -71,11 +87,11 @@ descriptors = cell(num_files,1);
 % end
 
 % Save sift features and descriptors and load them when you rerun the code to save time
-% save('sift_descriptors.mat', 'descriptors')
-% save('sift_keypoints.mat', 'keypoints')
+% save(sift_descrption_file, 'descriptors')
+% save(sift_keypoints_file, 'keypoints')
 
-load('sift_descriptors.mat');
-load('sift_keypoints.mat');
+load(sift_descrption_file);
+load(sift_keypoints_file);
 
 %% Initialization: Compute camera pose for the first image
 
@@ -92,12 +108,12 @@ load('sift_keypoints.mat');
 
 % imshow('../../homework1.1/code/vertices.png')
 % title('Vertices numbering')
-%
+
 % num_points = 8;
 % image_points = mark_image(Filenames{1}, num_points);
-%
-% save('image_points.mat', 'image_points');
-load('image_points.mat');
+
+% save(image_points_file, 'image_points');
+load(image_points_file);
 
 [image_points, removed] = rmmissing(image_points(:, :));
 world_points = vertices(~removed, :);
@@ -202,7 +218,6 @@ for i = 1:(num_files - 1)
     model.descriptors = model.descriptors(:, 1:points_found);
 
     % 2) Find SIFT matches
-    img = single(rgb2gray(imread(Filenames{i+1})));
     sift_matches = vl_ubcmatch(descriptors{i+1}, model.descriptors, threshold_ubcmatch);
     image_matches_idx = sift_matches(1, :);
     model_matches_idx = sift_matches(2, :);
@@ -263,11 +278,14 @@ end
 figure()
 % Predicted trajectory
 visualise_trajectory(vertices, edges, cam_in_world_orientations, cam_in_world_locations, 'Color', 'b');
-hold on;
-% Ground Truth trajectory
-visualise_trajectory(vertices, edges, gt_valid.orientations, gt_valid.locations, 'Color', 'g');
-hold off;
-title('\color{green}Ground Truth trajectory \color{blue}Predicted trajectory')
+
+if ~test
+    hold on;
+    % Ground Truth trajectory
+    visualise_trajectory(vertices, edges, gt_valid.orientations, gt_valid.locations, 'Color', 'g');
+    hold off;
+    title('\color{green}Ground Truth trajectory \color{blue}Predicted trajectory')
+end
 
 %% Visualize bounding boxes
 
@@ -277,12 +295,16 @@ for i=1:num_files
     imshow(char(Filenames(i)), 'InitialMagnification', 'fit');
     title(sprintf('Image: %d', i))
     hold on
-    % Ground Truth Bounding Boxes
-    points_gt = project3d2image(vertices',camera_params, gt_valid.orientations(:,:,i), gt_valid.locations(:, :, i));
+    if ~test
+        % Ground Truth Bounding Boxes
+        points_gt = project3d2image(vertices',camera_params, gt_valid.orientations(:,:,i), gt_valid.locations(:, :, i));
+    end
     % Predicted Bounding Boxes
     points_pred = project3d2image(vertices',camera_params, cam_in_world_orientations(:,:,i), cam_in_world_locations(:, :, i));
     for j=1:12
-        plot(points_gt(1, edges(:, j)), points_gt(2, edges(:,j)), 'color', 'g');
+        if ~test
+            plot(points_gt(1, edges(:, j)), points_gt(2, edges(:,j)), 'color', 'g');
+        end
         plot(points_pred(1, edges(:, j)), points_pred(2, edges(:,j)), 'color', 'b');
     end
     hold off;
@@ -307,9 +329,14 @@ end
 % We are expecting the mean absolute translational error (from ATE) to be
 % approximately less than 1cm
 
-% TODO: Estimate ATE and RPE for validation and test sequences
-frames = 6:30;
-save_trajectory('pred_valid.txt', frames, cam_in_world_orientations, cam_in_world_locations);
+% Estimate ATE and RPE for validation and test sequences
+if test
+    frames = 61:80;
+    save_trajectory('pred_test.txt', frames, cam_in_world_orientations, cam_in_world_locations);
+else
+    frames = 6:30;
+    save_trajectory('pred_valid.txt', frames, cam_in_world_orientations, cam_in_world_locations);
+end
 % then run:
 %../../../rgbd_benchmark_tools/scripts/evaluate_ate.py --plot ate_trajectory_plot.png --verbose gt_valid.txt pred_valid.txt
 %../../../rgbd_benchmark_tools/scripts/evaluate_rpe.py --fixed_delta --delta_unit f --plot rte_trajectory_plot.png --verbose gt_valid.txt pred_valid.txt
