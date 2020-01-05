@@ -24,10 +24,12 @@ public:
     void setMaxCategories(int maxCategories);
 	
 
-    void train(/* Fill */);
+    void train(const cv::Ptr<cv::ml::TrainData>& train_data);
 
-    float predict(/* Fill */);
+    // float predict(/* Fill */);
+    std::vector<int> predict(cv::InputArray samples);
 
+    float calcError(cv::Ptr<cv::ml::TrainData>& data, bool test, cv::OutputArray resp);
 
 private:
 	int mTreeCount;

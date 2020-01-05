@@ -1,0 +1,9 @@
+.vscode/
+bin/
+CMakeFiles/
+data/
+
+cmake_install.cmake
+CmakeCache.txt
+hog_vis.jpg
+Makefile
