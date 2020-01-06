@@ -4,6 +4,7 @@ CMakeFiles/
 data/
 
 cmake_install.cmake
-CmakeCache.txt
+CMakeCache.txt
 hog_vis.jpg
 Makefile
+

@@ -20,7 +20,7 @@ int main() {
     ExtractionResult extraction_result = extract(image);
 
     vector<vector<float> > descriptors = extraction_result.results;
-    HOGDescriptor hog_detector = extraction_result.hog_detector;
+    HOGDescriptor& hog_detector = extraction_result.hog_detector;
     vector<Mat> images = extraction_result.images;
 
     printf("%zu\n", descriptors.size());
