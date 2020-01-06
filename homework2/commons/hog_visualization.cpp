@@ -1,4 +1,6 @@
-void visualizeHOG(cv::Mat img, std::vector<float> &feats, cv::HOGDescriptor hog_detector, int scale_factor = 3);
+#include "hog_visualization.h"
+
+// void visualizeHOG(cv::Mat img, std::vector<float> &feats, cv::HOGDescriptor hog_detector, int scale_factor = 3);
 /*
  * img - the image used for computing HOG descriptors. **Attention here the size of the image should be the same as the window size of your cv::HOGDescriptor instance **
  * feats - the hog descriptors you get after calling cv::HOGDescriptor::compute
@@ -7,7 +9,7 @@ void visualizeHOG(cv::Mat img, std::vector<float> &feats, cv::HOGDescriptor hog_
  */
 
 
-void visualizeHOG(cv::Mat img, std::vector<float> &feats, cv::HOGDescriptor hog_detector, int scale_factor) {
+void visualizeHOG(cv::Mat img, std::vector<float> &feats, const cv::HOGDescriptor &hog_detector, int scale_factor) {
 
     cv::Mat visual_image;
     resize(img, visual_image, cv::Size(img.cols * scale_factor, img.rows * scale_factor));

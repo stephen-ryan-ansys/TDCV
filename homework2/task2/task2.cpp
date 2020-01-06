@@ -1,27 +1,64 @@
-
 #include <opencv2/opencv.hpp>
-#include <iostream>
+#include <opencv2/ml/ml.hpp>
+#include <dirent.h>
+#include <string>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <map>
 
-
-#include "HOGDescriptor.h"
+#include "../commons/feature_extraction.h"
 #include "RandomForest.h"
 
 using namespace std;
+using namespace cv;
+using namespace cv::ml;
+
+int is_regular_file(const char *path) {
+    struct stat path_stat;
+    stat(path, &path_stat);
+    return S_ISREG(path_stat.st_mode);
+}
+
+Ptr<TrainData> generate_data(string base_path) {
+    vector<string> dirs = {"00", "01", "02", "03", "04", "05"};
+    vector<int> categories = {0, 1, 2, 3, 4, 5};
+
+    Mat input;
+    Mat ground_truth;
+    for (int i = 0;i < dirs.size(); i++) {
+        string class_path = base_path + dirs.at(i) + "/";
+        cout << "Generating data for folder: " + class_path << endl;
+        DIR * dirp = opendir(class_path.c_str());
+        dirent * dp;
+        while ((dp = readdir(dirp)) != NULL) {
+            string full_path = class_path + dp->d_name;
+            if (is_regular_file(full_path.c_str())) {
+                Mat image = imread(full_path.c_str(), 1);
+                ExtractionResult extraction_result = extract(image);
+                vector<vector<float> > features = extraction_result.results;
+
+                int category = categories.at(i);
+                for (int j = 0;j < features.size(); j++) {
+                    Mat feature = Mat(features.at(j)).reshape(1, 1);
+                    feature.convertTo(feature, CV_32F);
+                    input.push_back(feature);
+                    ground_truth.push_back(category);
+                }
+            }
+        }
+        (void)closedir(dirp);
+    }
+
+    return TrainData::create(input, ROW_SAMPLE, ground_truth);
+}
 
 template<class ClassifierType>
 void performanceEval(cv::Ptr<ClassifierType> classifier, cv::Ptr<cv::ml::TrainData> data) {
+    classifier->train(data);
 
-	/* 
-
-		Fill Code 	
-
-	*/
-
+    printf("error: %f\n", classifier->calcError(data, false, noArray()) );
 };
-
-
-
-
 
 void testDTrees() {
 
@@ -34,11 +71,22 @@ void testDTrees() {
 
     */
 
+    Ptr<TrainData> train_data = generate_data("data/task2/train/");
+    Ptr<TrainData> test_data = generate_data("data/task2/test/");
+
+    Ptr<DTrees> tree = DTrees::create();
+    tree->setCVFolds(0);
+    tree->setMaxCategories(6);
+    tree->setMaxDepth(20);
+    tree->setMinSampleCount(2);
+
+    printf("Performance evaluation on training data\n");
     performanceEval<cv::ml::DTrees>(tree, train_data);
+
+    printf("Performance evaluation on test data\n");
     performanceEval<cv::ml::DTrees>(tree, test_data);
 
 }
-
 
 void testForest(){
 
@@ -52,12 +100,18 @@ void testForest(){
 
     */
 
+    Ptr<TrainData> train_data = generate_data("data/task2/train/");
+    Ptr<TrainData> test_data = generate_data("data/task2/test/");
+
+    Ptr<RandomForest> forest = new RandomForest(5, 20, 0, 2, num_classes);
+
+    printf("Performance evaluation on training data\n");
     performanceEval<RandomForest>(forest, train_data);
+    printf("Performance evaluation on test data\n");
     performanceEval<RandomForest>(forest, test_data);
 }
 
-
-int main(){
+int main() {
     testDTrees();
     testForest();
     return 0;
