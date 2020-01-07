@@ -80,8 +80,33 @@ void RandomForest::setMaxCategories(int maxCategories)
 void RandomForest::train(const cv::Ptr<cv::ml::TrainData>& train_data)
 {
     // Fill
+    // TODO: what is a good value? Is this the expected amount of inliers?
+    double train_frac = 0.9;
+    int total_samples = train_data->getNTrainSamples();
+    int num_train = train_frac*total_samples;
+    std::cout << "training each tree with " << num_train << " out of " << total_samples << " total samples." << std::endl;
+
+    std::vector<int> shuffled;
+    for (int i = 0; i < total_samples; i++) {
+        shuffled.push_back(i);
+    }
+
     for (int i = 0; i < mTreeCount; i++) {
-        mTrees[i]->train(train_data);
+        std::random_shuffle(shuffled.begin(), shuffled.end());
+
+        cv::Mat samples = train_data->getSamples();
+        cv::Mat responses = train_data->getResponses();
+        cv::Mat samples_shuffled(num_train, samples.cols, samples.type());
+        cv::Mat responses_shuffled(num_train, 1, responses.type());
+
+        for (int i = 0; i < num_train; i++) {
+            // need to be deep copies because of how opencv handles matrices
+            samples.row(shuffled[i]).copyTo(samples_shuffled.row(i));
+            responses.row(shuffled[i]).copyTo(responses_shuffled.row(i));
+        }
+        cv::Ptr<cv::ml::TrainData> train_data_shuffled(cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, responses_shuffled));
+
+        mTrees[i]->train(train_data_shuffled);
     }
 }
 
@@ -125,11 +150,11 @@ float RandomForest::calcError(cv::Ptr<cv::ml::TrainData>& data, bool test, cv::O
         if (ground_truth.at(i) == results.at(i)) {
             correct++;
         } else {
-            // cout << ground_truth.at(i) << " " << results.at(i) << endl;
+            // std::cout << ground_truth.at(i) << " " << results.at(i) << std::endl;
         }
     }
 
-    // cout << "Correct: " << correct << endl;
-    // cout << "Total: " << results.size() << endl;
+    // std::cout << "Correct: " << correct << std::endl;
+    // std::cout << "Total: " << results.size() << std::endl;
     return (1 - ((correct + 0.0) / results.size())) * 100;
 }

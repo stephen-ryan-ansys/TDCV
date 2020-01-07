@@ -38,7 +38,7 @@ private:
 	int mMinSampleCount;
 	int mMaxCategories;
 
-    // M-Trees for constructing thr forest
+    // M-Trees for constructing the forest
     std::vector<cv::Ptr<cv::ml::DTrees> > mTrees;
 };
 
