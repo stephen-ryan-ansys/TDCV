@@ -72,8 +72,17 @@ Ptr<TrainData> generate_data(string base_path) {
 }
 
 
-void visualize_bounding_boxes(vector<BoundingBox> bounding_boxes, Mat image) {
-    // TODO
+void visualize_detected_objects(vector<DetectedObject> detected_objects, Mat image) {
+    for (DetectedObject d : detected_objects) {
+        BoundingBox b = d.bounding_box;
+        Rect rect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+
+        rectangle(image, rect, Scalar(0, 255, 0));
+        break;
+    }
+
+    imshow("boxes", image);
+    waitKey(0);
 }
 
 
@@ -97,6 +106,7 @@ vector<BoundingBox> get_bounding_boxes(Mat image) {
 
 
 vector<DetectedObject> detect_object(Mat image, Ptr<RandomForest> forest) {
+    vector<DetectedObject> detected_objects;
     cout << "Generating bounding boxes..." << endl;
 
     vector<BoundingBox> bounding_boxes = get_bounding_boxes(image);
@@ -132,19 +142,11 @@ vector<DetectedObject> detect_object(Mat image, Ptr<RandomForest> forest) {
         // cout << b.x1 << " " << b.y1 << " " << b.x2 << " " << b.y2 << " " << c << endl;
 
         if (c > 0.9) {
-            chosen.push_back(b);
+            detected_objects.push_back({b, c});
         }
     }
 
-    for (BoundingBox b : chosen) {
-        Rect rect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
-
-        rectangle(image, rect, Scalar(0, 255, 0));
-        // break;
-    }
-
-    imshow("original", image);
-    waitKey(0);
+    return detected_objects;
 }
 
 
@@ -158,8 +160,8 @@ int main() {
     vector<Mat> test_images = get_images("data/task3/test/");
     cout << "Detecing object..." << endl;
     for (Mat test_image : test_images) {
-        vector<DetectedObject> bounding_boxes = detect_object(test_image, forest);
-        // visualize_bounding_boxes(bounding_boxes, test_image);
+        vector<DetectedObject> detected_objects = detect_object(test_image, forest);
+        visualize_detected_objects(detected_objects, test_image);
 
         break;
     }
