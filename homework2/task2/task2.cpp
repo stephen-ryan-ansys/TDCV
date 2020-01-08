@@ -106,12 +106,12 @@ void testForest(){
 
     bool load = true;
     if (load) {
-        forest->load("model/task2");
+        forest->load("model/task2/");
     }
 
     performanceEval<RandomForest>(forest, train_data, test_data, load);
 
-    forest->save("model/task2");
+    forest->save("model/task2/");
 }
 
 int main() {
