@@ -20,6 +20,7 @@ struct BoundingBox {
 struct DetectedObject {
     BoundingBox bounding_box;
     float confidence;
+    int prediction;
 };
 
 int is_regular_file(const char *path) {
@@ -73,16 +74,57 @@ Ptr<TrainData> generate_data(string base_path) {
 
 
 void visualize_detected_objects(vector<DetectedObject> detected_objects, Mat image) {
-    for (DetectedObject d : detected_objects) {
+    for (DetectedObject &d : detected_objects) {
         BoundingBox b = d.bounding_box;
         Rect rect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
 
         rectangle(image, rect, Scalar(0, 255, 0));
-        break;
+        // break;
     }
 
     imshow("boxes", image);
     waitKey(0);
+}
+
+
+double IOU(const BoundingBox &box1, const BoundingBox &box2) {
+    int xA = std::max(box1.x1, box2.x1);
+    int yA = std::max(box1.y1, box2.y1);
+    int xB = std::min(box1.x2, box2.x2);
+    int yB = std::min(box1.y2, box2.y2);
+    double inter_area = max(0, xB-xA + 1) * max(0, yB-yA + 1);
+    int box1_area = (box1.x2 - box1.x1 + 1) * (box1.y2 - box1.y1 + 1);
+    int box2_area = (box2.x2 - box2.x1 + 1) * (box2.y2 - box2.y1 + 1);
+
+    double iou = inter_area/(box1_area + box2_area - inter_area);
+    return iou;
+}
+
+
+vector<DetectedObject> non_maximum_supression(vector<DetectedObject> detected_objects, double thresh) {
+    vector<DetectedObject> non_supressed;
+
+    for (DetectedObject &d : detected_objects) {
+        bool is_max_confidence = true;
+        for (DetectedObject &other : detected_objects) {
+            if (d.prediction != other.prediction) {
+                continue;
+            }
+            double iou = IOU(d.bounding_box, other.bounding_box);
+            // cout << "iou " << iou << ", other conf: " << other.confidence << ", d.conf: " << d.confidence << endl;
+            bool overlapping = iou > thresh;
+            if (other.confidence > d.confidence && overlapping) {
+                is_max_confidence = false;
+                break;
+            }
+        }
+        if (is_max_confidence) {
+            // cout << "detected a box for something" << endl;
+            non_supressed.push_back(d);
+        }
+    }
+
+    return non_supressed;
 }
 
 
@@ -113,7 +155,7 @@ vector<DetectedObject> detect_object(Mat image, Ptr<RandomForest> forest) {
 
     cout << "Extracting features for " << bounding_boxes.size() << " boxes..." << endl;
     Mat input;
-    for (BoundingBox bounding_box : bounding_boxes) {
+    for (BoundingBox &bounding_box : bounding_boxes) {
         int x = bounding_box.x1;
         int y = bounding_box.y1;
         int width = bounding_box.x2 - x;
@@ -141,8 +183,9 @@ vector<DetectedObject> detect_object(Mat image, Ptr<RandomForest> forest) {
         int p = predictions.at(i);
         // cout << b.x1 << " " << b.y1 << " " << b.x2 << " " << b.y2 << " " << c << endl;
 
-        if (c > 0.9) {
-            detected_objects.push_back({b, c});
+        // TODO: this should be able to be selected ()
+        if (c > 0.67 && p != 3) {
+            detected_objects.push_back({b, c, p});
         }
     }
 
@@ -155,7 +198,7 @@ int main() {
     bool load = false;
 
     Ptr<TrainData> train_data = generate_data("data/task3/train/");
-    Ptr<RandomForest> forest = new RandomForest(5, 20, 0, 2, 6);
+    Ptr<RandomForest> forest = new RandomForest(20, 20, 0, 2, 6);
 
     if (load) {
         forest->load("model/task3");
@@ -172,7 +215,12 @@ int main() {
     cout << "Detecing object..." << endl;
     for (Mat test_image : test_images) {
         vector<DetectedObject> detected_objects = detect_object(test_image, forest);
-        visualize_detected_objects(detected_objects, test_image);
+        cout << detected_objects.size() << endl;
+        visualize_detected_objects(detected_objects, test_image.clone());
+        vector<DetectedObject> non_suppressed = non_maximum_supression(detected_objects, 0.5);
+        std::cout << "max_suppression done" << std::endl;
+        cout << non_suppressed.size() << endl;
+        visualize_detected_objects(non_suppressed, test_image.clone());
 
         break;
     }

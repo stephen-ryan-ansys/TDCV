@@ -90,7 +90,7 @@ void RandomForest::train(const cv::Ptr<cv::ml::TrainData>& train_data)
 {
     // Fill
     // TODO: what is a good value? Is this the expected amount of inliers?
-    double train_frac = 0.9;
+    double train_frac = 0.5;
     int total_samples = train_data->getNTrainSamples();
     int num_train = train_frac*total_samples;
     std::cout << "training each tree with " << num_train << " out of " << total_samples << " total samples." << std::endl;
@@ -116,6 +116,7 @@ void RandomForest::train(const cv::Ptr<cv::ml::TrainData>& train_data)
         cv::Ptr<cv::ml::TrainData> train_data_shuffled(cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, responses_shuffled));
 
         mTrees[i]->train(train_data_shuffled);
+        std::cout << "tree " << (i + 1) << " of " << mTreeCount << " trained" << std::endl;
     }
 }
 
@@ -129,9 +130,8 @@ void RandomForest::save(const cv::String &dirpath) const {
     int i = 0;
     for (auto tree : mTrees) {
         const std::string savepath = dirpath_new + std::to_string(i) + ".model";
-        std::cout << savepath << std::endl;
         tree->save(savepath);
-        std::cout << "saved tree " << i << " of " << (mTreeCount - 1) << std::endl;
+        std::cout << "saved tree " << savepath << std::endl;
         i++;
     }
 }
@@ -150,7 +150,6 @@ void RandomForest::load(const cv::String &dirpath) {
 
     for (int i = 0; i < mTreeCount; i++) {
         const std::string loadpath = dirpath_new + std::to_string(i) + ".model";
-        std::cout << "loading tree " << loadpath << std::endl;
         mTrees.push_back(cv::ml::DTrees::load(loadpath));
         std::cout << "loaded tree " << loadpath << std::endl;
         if (i == 0) {
