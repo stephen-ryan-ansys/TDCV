@@ -255,8 +255,8 @@ void save_result(Mat result, vector<DetectedObject> detected_objects, int image_
 }
 
 vector<vector<DetectedObject> > load_results(std::string dirpath) {
-    vector<vector<DetectedObject> > results(43);
-    for (int i = 0; i < 43; i++ ) {
+    vector<vector<DetectedObject> > results(44);
+    for (int i = 0; i < 44; i++ ) {
         results.at(i).clear();
         std::stringstream ss;
         ss << std::setw(4) << std::setfill('0') << i;
@@ -281,6 +281,14 @@ vector<vector<DetectedObject> > load_results(std::string dirpath) {
             infile >> label >> confidence;
             results.at(i).at(j).confidence = confidence;
         }
+
+        // std::cout << i << std::endl;
+        // auto &blah = results.at(i);
+        // for (int j = 0; j < 3; j++) {
+        //     auto &box = blah.at(j).bounding_box;
+        //     std::cout << blah.at(j).prediction << " " << box.x1 << " " << box.y1 << " " << box.x2 << " " << box.y2 << " " << blah.at(j).confidence << std::endl;
+        // }
+
         infile.close();
     }
     return results;
