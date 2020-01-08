@@ -1,7 +1,7 @@
 #include <utility>
 #include "feature_extraction.h"
 
-ExtractionResult extract(InputArray img) {
+ExtractionResult extract(InputArray img, bool single) {
     ExtractionResult extraction_result;
     vector<vector<float> > results;
     vector<Mat> images;
@@ -21,6 +21,13 @@ ExtractionResult extract(InputArray img) {
     hog_detector.compute(resized, feats, Size(), Size(), vector<Point>());
     results.push_back(feats);
     images.push_back(resized);
+
+    if (single) {
+        extraction_result.results = results;
+        extraction_result.images = images;
+        extraction_result.hog_detector = hog_detector;
+        return extraction_result;
+    }
 
     // Rotate 90
     Mat rotated_90;

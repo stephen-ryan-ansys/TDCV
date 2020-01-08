@@ -20,7 +20,7 @@ int is_regular_file(const char *path) {
     return S_ISREG(path_stat.st_mode);
 }
 
-Ptr<TrainData> generate_data(string base_path) {
+Ptr<TrainData> generate_data(string base_path, bool is_test=false) {
     vector<string> dirs = {"00", "01", "02", "03", "04", "05"};
     vector<int> categories = {0, 1, 2, 3, 4, 5};
 
@@ -35,7 +35,7 @@ Ptr<TrainData> generate_data(string base_path) {
             string full_path = class_path + dp->d_name;
             if (is_regular_file(full_path.c_str())) {
                 Mat image = imread(full_path.c_str(), 1);
-                ExtractionResult extraction_result = extract(image);
+                ExtractionResult extraction_result = extract(image, is_test);
                 vector<vector<float> > features = extraction_result.results;
 
                 int category = categories.at(i);
@@ -75,7 +75,7 @@ void testDTrees() {
     */
 
     Ptr<TrainData> train_data = generate_data("data/task2/train/");
-    Ptr<TrainData> test_data = generate_data("data/task2/test/");
+    Ptr<TrainData> test_data = generate_data("data/task2/test/", true);
 
     Ptr<DTrees> tree = DTrees::create();
     tree->setCVFolds(0);
@@ -99,7 +99,7 @@ void testForest(){
     */
 
     Ptr<TrainData> train_data = generate_data("data/task2/train/");
-    Ptr<TrainData> test_data = generate_data("data/task2/test/");
+    Ptr<TrainData> test_data = generate_data("data/task2/test/", true);
 
     Ptr<RandomForest> forest = new RandomForest(5, 20, 0, 2, num_classes);
 
