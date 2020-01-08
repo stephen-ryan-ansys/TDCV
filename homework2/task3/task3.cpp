@@ -323,7 +323,7 @@ int main() {
             int tp = 0;
             int total_ground_truth;
             int label,x1,y1,x2,y2;
-            while (infile >> label >> y1 >> x1 >> y2 >> x2) {
+            while (infile >> label >> x1 >> y1 >> x2 >> y2) {
                 BoundingBox gt{x1, y1, x2, y2};
                 if (mapContainsKey(item_map, label)) {
                     BoundingBox pred = item_map[label].bounding_box;
@@ -341,8 +341,8 @@ int main() {
                 total_ground_truth++;
             }
 
-            double precision = tp / total_detected;
-            double recall = tp / total_ground_truth;
+            double precision = (double)tp / (double)total_detected;
+            double recall = (double)tp / (double)total_ground_truth;
             cout << "PRECISION RECALL" << endl;
             cout << precision << " " << recall << endl;
         }
