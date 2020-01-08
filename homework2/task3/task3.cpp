@@ -161,7 +161,7 @@ vector<BoundingBox> get_bounding_boxes(Mat image) {
     vector<BoundingBox> bounding_boxes;
     int rows = image.rows;
     int cols = image.cols;
-    int slide = 2;
+    int slide = 4;
     
     for (int size = 80; size <= 200; size+= 20) {
         for (int i = 0; i <= rows - size; i+= slide) {
@@ -233,6 +233,7 @@ void save_result(Mat result, vector<DetectedObject> detected_objects, int image_
 
     imwrite("results/result" + result_num + ".jpg", result);
 
+    std::vector<std::string> conf_vec(3, "");
     std::ofstream out("results/" + result_num + ".result" + ".txt");
     for (int i = 0; i < 3; i ++ ) {
         DetectedObject write_obj;
@@ -244,6 +245,11 @@ void save_result(Mat result, vector<DetectedObject> detected_objects, int image_
         }
         auto &bb = write_obj.bounding_box;
         out << i << " " << bb.x1 << " " << bb.y1 << " " << bb.x2 << " " << bb.y2 << std::endl;
+        conf_vec.at(i) = std::to_string(i) + " " + std::to_string(write_obj.confidence);
+    }
+    out << std::endl;
+    for (int i = 0; i < 3; i++) {
+        out << conf_vec.at(i) << std::endl;
     }
     out.close();
 }
@@ -276,17 +282,15 @@ int main() {
         image_num++;
         std::cout << "Detecting Image " << image_num << std::endl;
         vector<DetectedObject> detected_objects = detect_object(test_image, forest);
-        cout << detected_objects.size() << endl;
+        // cout << detected_objects.size() << endl;
         // visualize_detected_objects(detected_objects, test_image.clone());
 
         vector<DetectedObject> non_suppressed = non_maximum_supression(detected_objects, 0.5);
         std::cout << "max_suppression done" << std::endl;
-        cout << non_suppressed.size() << endl;
+        // cout << non_suppressed.size() << endl;
         // visualize_detected_objects(non_suppressed, test_image.clone());
 
-        if (non_suppressed.size() > 3) {
-            non_suppressed = filter_highest_confidence(non_suppressed);
-        }
+        non_suppressed = filter_highest_confidence(non_suppressed);
 
         Mat result = visualize_detected_objects(non_suppressed, test_image.clone(), false);
         save_result(result, non_suppressed, image_num);
