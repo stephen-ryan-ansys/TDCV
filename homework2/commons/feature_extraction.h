@@ -13,6 +13,6 @@ struct ExtractionResult {
     HOGDescriptor hog_detector;
 };
 
-ExtractionResult extract(InputArray img);
+ExtractionResult extract(InputArray img, bool single=false);
 
 #endif
