@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <sstream>
+#include <iomanip>
+#include <fstream>
 
 #include "../commons/feature_extraction.h"
 #include "../task2/RandomForest.h"
@@ -19,7 +22,7 @@ struct BoundingBox {
 
 struct DetectedObject {
     BoundingBox bounding_box;
-    float confidence;
+    double confidence;
     int prediction;
 };
 
@@ -134,7 +137,7 @@ vector<BoundingBox> get_bounding_boxes(Mat image) {
     int cols = image.cols;
     int slide = 2;
     
-    for (int size = 80; size <= 80; size+= 2) {
+    for (int size = 80; size <= 100; size+= 10) {
         for (int i = 0; i <= rows - size; i+= slide) {
             for (int j = 0; j <= cols - size; j+= slide) {
                 BoundingBox bounding_box = {j, i, j+size, i+size};
@@ -192,6 +195,10 @@ vector<DetectedObject> detect_object(Mat image, Ptr<RandomForest> forest) {
     return detected_objects;
 }
 
+bool mapContainsKey(std::map<int, DetectedObject>& map, int key) {
+    if (map.find(key) == map.end()) return false;
+    return true;
+}
 
 int main() {
     bool save = true;
@@ -211,6 +218,8 @@ int main() {
         forest->save("model/task3");
     }
 
+    vector<vector<DetectedObject> > results;
+
     vector<Mat> test_images = get_images("data/task3/test/");
     cout << "Detecing object..." << endl;
     for (Mat test_image : test_images) {
@@ -222,7 +231,61 @@ int main() {
         cout << non_suppressed.size() << endl;
         visualize_detected_objects(non_suppressed, test_image.clone());
 
+        results.push_back(non_suppressed);
         break;
+    }
+
+    for (double t = 0.5; t <= 1.0; t += 0.1) {
+        cout << "Computing precision/recall for threshold: " << t << endl;
+        for (int i = 0; i < results.size(); i++) {
+            vector<DetectedObject> detected_objects = results.at(i);
+
+            int total_detected = detected_objects.size();
+
+            // Assumption: all test image contain exactly 1 of each item.
+            map<int, DetectedObject> item_map;
+            for (DetectedObject detected_object : detected_objects) {
+                int p = detected_object.prediction;
+
+                // Take whatever
+                if (!mapContainsKey(item_map, p)) {
+                    item_map[p] = detected_object;
+                }
+            }
+
+            std::stringstream ss;
+            ss << std::setw(4) << std::setfill('0') << i;
+            std::string s = ss.str();
+
+            string path = "data/task3/gt/" + s + ".gt.txt";
+            std::ifstream infile(path);
+
+            int tp = 0;
+            int total_ground_truth;
+            int label,x1,y1,x2,y2;
+            while (infile >> label >> y1 >> x1 >> y2 >> x2) {
+                BoundingBox gt{x1, y1, x2, y2};
+                if (mapContainsKey(item_map, label)) {
+                    BoundingBox pred = item_map[label].bounding_box;
+                    cout << path << endl;
+                    cout << pred.x1 << " " << pred.x2 << " " <<  pred.y1 << " " << pred.y2 << endl;
+                    cout << gt.x1 << " " << gt.x2 << " " <<  gt.y1 << " " << gt.y2 << endl;
+                    double iou = IOU(pred, gt);
+                    cout << iou << endl;
+
+                    if (iou > t) {
+                        tp++;
+                    }
+                }
+
+                total_ground_truth++;
+            }
+
+            double precision = tp / total_detected;
+            double recall = tp / total_ground_truth;
+            cout << "PRECISION RECALL" << endl;
+            cout << precision << " " << recall << endl;
+        }
     }
 
     return 0;
