@@ -54,8 +54,10 @@ Ptr<TrainData> generate_data(string base_path, bool is_test=false) {
 }
 
 template<class ClassifierType>
-void performanceEval(cv::Ptr<ClassifierType> classifier, cv::Ptr<cv::ml::TrainData> train_data, cv::Ptr<cv::ml::TrainData> test_data) {
-    classifier->train(train_data);
+void performanceEval(cv::Ptr<ClassifierType> classifier, cv::Ptr<cv::ml::TrainData> train_data, cv::Ptr<cv::ml::TrainData> test_data, bool load = false) {
+    if (!load) {
+        classifier->train(train_data);
+    }
 
     printf("Performance evaluation on training data\n");
     printf("error: %f\n", classifier->calcError(train_data, false, noArray()) );
@@ -100,10 +102,16 @@ void testForest(){
 
     Ptr<TrainData> train_data = generate_data("data/task2/train/");
     Ptr<TrainData> test_data = generate_data("data/task2/test/", true);
-
     Ptr<RandomForest> forest = new RandomForest(5, 20, 0, 2, num_classes);
 
-    performanceEval<RandomForest>(forest, train_data, test_data);
+    bool load = true;
+    if (load) {
+        forest->load("model/task2");
+    }
+
+    performanceEval<RandomForest>(forest, train_data, test_data, load);
+
+    forest->save("model/task2");
 }
 
 int main() {
