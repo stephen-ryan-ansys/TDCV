@@ -256,7 +256,7 @@ int main() {
     Ptr<RandomForest> forest = new RandomForest(100, 10, 0, 2, 4);
 
     if (load) {
-        forest->load("model/task3/");
+        forest->load("model/task3");
     } else {
         cout << "Training classifier..." << endl;
         forest->train(train_data);
@@ -322,13 +322,13 @@ int main() {
             std::ifstream infile(path);
 
             int tp = 0;
-            int total_ground_truth;
+            int total_ground_truth = 0;
             int label,x1,y1,x2,y2;
             while (infile >> label >> x1 >> y1 >> x2 >> y2) {
                 BoundingBox gt{x1, y1, x2, y2};
                 if (mapContainsKey(item_map, label)) {
                     BoundingBox pred = item_map[label].bounding_box;
-                    cout << path << endl;
+                    cout << "Label: " << label << endl;
                     cout << pred.x1 << " " << pred.x2 << " " <<  pred.y1 << " " << pred.y2 << endl;
                     cout << gt.x1 << " " << gt.x2 << " " <<  gt.y1 << " " << gt.y2 << endl;
                     double iou = IOU(pred, gt);
@@ -341,6 +341,7 @@ int main() {
 
                 total_ground_truth++;
             }
+            cout << tp << " " << total_detected << " " << total_ground_truth << endl;
 
             double precision = (double)tp / (double)total_detected;
             double recall = (double)tp / (double)total_ground_truth;
