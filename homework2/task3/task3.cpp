@@ -151,11 +151,22 @@ vector<DetectedObject> detect_object(Mat image, Ptr<RandomForest> forest) {
 
 
 int main() {
+    bool save = true;
+    bool load = false;
+
     Ptr<TrainData> train_data = generate_data("data/task3/train/");
     Ptr<RandomForest> forest = new RandomForest(5, 20, 0, 2, 6);
 
-    cout << "Training classifier..." << endl;
-    forest->train(train_data);
+    if (load) {
+        forest->load("model/task3");
+    } else {
+        cout << "Training classifier..." << endl;
+        forest->train(train_data);
+    }
+
+    if (save) {
+        forest->save("model/task3");
+    }
 
     vector<Mat> test_images = get_images("data/task3/test/");
     cout << "Detecing object..." << endl;

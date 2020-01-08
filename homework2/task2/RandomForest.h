@@ -23,10 +23,13 @@ public:
     void setMinSampleCount(int minSampleCount);
     void setMaxCategories(int maxCategories);
 
-    std::vector<int> getPredictions();
-    std::vector<double> getConfidences();
+    std::vector<int> getPredictions() const;
+    std::vector<double> getConfidences() const;
 
     void train(const cv::Ptr<cv::ml::TrainData>& train_data);
+
+    void save(const cv::String &dirpath) const;
+    void load(const cv::String &dirpath);
 
     // float predict(/* Fill */);
     std::vector<int> predict(cv::InputArray samples);
