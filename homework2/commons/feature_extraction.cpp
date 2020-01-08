@@ -26,12 +26,12 @@ ExtractionResult extract(InputArray img, bool single) {
         vector<Mat> flips = get_flips(rotation);
         for (Mat flip : flips) {
 
-            // Crops
-            vector<Mat> resized_crops = get_resized_crops(flip);
+            // // Crops
+            // vector<Mat> resized_crops = get_resized_crops(flip);
 
-            for (Mat resized_crop : resized_crops) {
+            // for (Mat resized_crop : resized_crops) {
                 vector<float> feats;
-                hog_detector.compute(resized_crop, feats, Size(), Size(), vector<Point>());
+                hog_detector.compute(flip, feats, Size(), Size(), vector<Point>());
                 results.push_back(feats);
                 images.push_back(resized);
 
@@ -41,7 +41,7 @@ ExtractionResult extract(InputArray img, bool single) {
                     extraction_result.hog_detector = hog_detector;
                     return extraction_result;
                 }
-            }
+            // }
         }
     }
 
