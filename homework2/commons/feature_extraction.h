@@ -15,4 +15,8 @@ struct ExtractionResult {
 
 ExtractionResult extract(InputArray img, bool single=false);
 
+vector<Mat> get_rotations(Mat image);
+vector<Mat> get_flips(Mat image);
+vector<Mat> get_resized_crops(Mat image);
+
 #endif
