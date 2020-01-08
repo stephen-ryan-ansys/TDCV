@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <fstream>
+#include <iostream>
 
 #include "../commons/feature_extraction.h"
 #include "../task2/RandomForest.h"
@@ -73,17 +75,30 @@ Ptr<TrainData> generate_data(string base_path) {
 }
 
 
-void visualize_detected_objects(vector<DetectedObject> detected_objects, Mat image) {
+Mat visualize_detected_objects(vector<DetectedObject> detected_objects, Mat image, bool show = true) {
     for (DetectedObject &d : detected_objects) {
         BoundingBox b = d.bounding_box;
         Rect rect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+        Scalar color;
+        if (d.prediction == 0) {
+            color = Scalar(255, 0, 0);
+        } else if (d.prediction == 1) {
+            color = Scalar(0, 255, 0);
+        } else if (d.prediction == 2) {
+            color = Scalar(0, 0, 255);
+        } else {
+            color = Scalar(127, 127, 127);
+        }
+        
 
-        rectangle(image, rect, Scalar(0, 255, 0));
+        rectangle(image, rect, color);
         // break;
     }
-
-    imshow("boxes", image);
-    waitKey(0);
+    if (show) {
+        imshow("boxes", image);
+        waitKey(0);
+    }
+    return image;
 }
 
 
@@ -107,11 +122,10 @@ vector<DetectedObject> non_maximum_supression(vector<DetectedObject> detected_ob
     for (DetectedObject &d : detected_objects) {
         bool is_max_confidence = true;
         for (DetectedObject &other : detected_objects) {
-            if (d.prediction != other.prediction) {
-                continue;
-            }
+            // if (d.prediction != other.prediction) {
+            //     continue;
+            // }
             double iou = IOU(d.bounding_box, other.bounding_box);
-            // cout << "iou " << iou << ", other conf: " << other.confidence << ", d.conf: " << d.confidence << endl;
             bool overlapping = iou > thresh;
             if (other.confidence > d.confidence && overlapping) {
                 is_max_confidence = false;
@@ -119,12 +133,25 @@ vector<DetectedObject> non_maximum_supression(vector<DetectedObject> detected_ob
             }
         }
         if (is_max_confidence) {
-            // cout << "detected a box for something" << endl;
             non_supressed.push_back(d);
         }
     }
 
     return non_supressed;
+}
+
+
+vector<DetectedObject> filter_highest_confidence(vector<DetectedObject> detected_objects) {
+    vector<DetectedObject> filtered(3);
+    std::vector<double> max_confidences(3, -1);
+    for (DetectedObject &d : detected_objects) {
+        int p = d.prediction;
+        if (d.confidence > max_confidences.at(p)) {
+            max_confidences.at(p) = d.confidence;
+            filtered.at(p) = d;
+        }
+    }
+    return filtered;
 }
 
 
@@ -134,7 +161,7 @@ vector<BoundingBox> get_bounding_boxes(Mat image) {
     int cols = image.cols;
     int slide = 2;
     
-    for (int size = 80; size <= 80; size+= 2) {
+    for (int size = 80; size <= 200; size+= 20) {
         for (int i = 0; i <= rows - size; i+= slide) {
             for (int j = 0; j <= cols - size; j+= slide) {
                 BoundingBox bounding_box = {j, i, j+size, i+size};
@@ -193,36 +220,73 @@ vector<DetectedObject> detect_object(Mat image, Ptr<RandomForest> forest) {
 }
 
 
+void save_result(Mat result, vector<DetectedObject> detected_objects, int image_num) {
+    std::stringstream ss;
+    ss << std::setw(4) << std::setfill('0') << image_num;
+    std::string result_num = ss.str();
+
+    imwrite("results/result" + result_num + ".jpg", result);
+
+    std::ofstream out("results/" + result_num + ".result" + ".txt");
+    for (int i = 0; i < 3; i ++ ) {
+        DetectedObject write_obj;
+        for (DetectedObject &d : detected_objects) {
+            if (d.prediction == i) {
+                write_obj = d;
+                break;
+            }
+        }
+        auto &bb = write_obj.bounding_box;
+        out << i << " " << bb.x1 << " " << bb.y1 << " " << bb.x2 << " " << bb.y2 << std::endl;
+    }
+    out.close();
+}
+
 int main() {
     bool save = true;
-    bool load = false;
+    bool load = true;
 
     Ptr<TrainData> train_data = generate_data("data/task3/train/");
-    Ptr<RandomForest> forest = new RandomForest(20, 20, 0, 2, 6);
+    Ptr<RandomForest> forest = new RandomForest(100, 10, 0, 2, 4);
 
     if (load) {
-        forest->load("model/task3");
+        forest->load("model/task3/");
     } else {
         cout << "Training classifier..." << endl;
         forest->train(train_data);
     }
 
     if (save) {
-        forest->save("model/task3");
+        forest->save("model/task3/");
     }
 
     vector<Mat> test_images = get_images("data/task3/test/");
     cout << "Detecing object..." << endl;
+
+    int image_num = -1;
     for (Mat test_image : test_images) {
+        image_num++;
+        std::cout << "Detecting Image " << image_num << std::endl;
         vector<DetectedObject> detected_objects = detect_object(test_image, forest);
         cout << detected_objects.size() << endl;
-        visualize_detected_objects(detected_objects, test_image.clone());
+        // visualize_detected_objects(detected_objects, test_image.clone());
+
         vector<DetectedObject> non_suppressed = non_maximum_supression(detected_objects, 0.5);
         std::cout << "max_suppression done" << std::endl;
         cout << non_suppressed.size() << endl;
-        visualize_detected_objects(non_suppressed, test_image.clone());
+        // visualize_detected_objects(non_suppressed, test_image.clone());
 
-        break;
+        if (non_suppressed.size() > 3) {
+            non_suppressed = filter_highest_confidence(non_suppressed);
+        }
+
+        Mat result = visualize_detected_objects(non_suppressed, test_image.clone(), false);
+
+        save_result(result, non_suppressed, image_num);
+
+        // do the comparison to the GT.
+
+        // break;
     }
 
     return 0;
