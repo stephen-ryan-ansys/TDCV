@@ -13,6 +13,8 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 add_definitions(${GCC_COVERAGE_COMPILE_FLAGS})
 add_executable(task1 task1/task1.cpp commons/feature_extraction.cpp commons/hog_visualization.cpp)
 add_executable(task2 task2/task2.cpp commons/feature_extraction.cpp commons/hog_visualization.cpp task2/RandomForest.cpp)
+add_executable(task3 task3/task3.cpp commons/feature_extraction.cpp commons/hog_visualization.cpp task2/RandomForest.cpp)
 
 target_link_libraries(task1 ${OpenCV_LIBS})
 target_link_libraries(task2 ${OpenCV_LIBS})
+target_link_libraries(task3 ${OpenCV_LIBS})
