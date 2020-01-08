@@ -254,9 +254,42 @@ void save_result(Mat result, vector<DetectedObject> detected_objects, int image_
     out.close();
 }
 
+vector<vector<DetectedObject> > load_results(std::string dirpath) {
+    vector<vector<DetectedObject> > results(43);
+    for (int i = 0; i < 43; i++ ) {
+        results.at(i).clear();
+        std::stringstream ss;
+        ss << std::setw(4) << std::setfill('0') << i;
+        std::string s = ss.str();
+        string path = dirpath + "/" + s + ".result.txt";
+        std::ifstream infile(path);
+
+        // read 3 lines from the file, same as gt
+        for (int j = 0; j < 3; j ++) {
+            int label,x1,y1,x2,y2;
+            infile >> label >> x1 >> y1 >> x2 >> y2;
+            BoundingBox b{x1,y1,x2,y2};
+            results.at(i).push_back({b, 0.0, label});
+        }
+        // skip an empty line
+        std::string skip;
+        std::getline(infile, skip);
+        // read 3 more lines for confidences
+        for (int j = 0; j < 3; j++) {
+            int label;
+            double confidence;
+            infile >> label >> confidence;
+            results.at(i).at(j).confidence = confidence;
+        }
+        infile.close();
+    }
+    return results;
+}
+
 int main() {
     bool save = true;
     bool load = true;
+    bool skip_detection = true;
 
     Ptr<TrainData> train_data = generate_data("data/task3/train/");
     Ptr<RandomForest> forest = new RandomForest(100, 10, 0, 2, 4);
@@ -275,28 +308,32 @@ int main() {
     vector<vector<DetectedObject> > results;
 
     vector<Mat> test_images = get_images("data/task3/test/");
-    cout << "Detecing object..." << endl;
+    if (!skip_detection) {
+        cout << "Detecing object..." << endl;
 
-    int image_num = -1;
-    for (Mat test_image : test_images) {
-        image_num++;
-        std::cout << "Detecting Image " << image_num << std::endl;
-        vector<DetectedObject> detected_objects = detect_object(test_image, forest);
-        // cout << detected_objects.size() << endl;
-        // visualize_detected_objects(detected_objects, test_image.clone());
+        int image_num = -1;
+        for (Mat test_image : test_images) {
+            image_num++;
+            std::cout << "Detecting Image " << image_num << std::endl;
+            vector<DetectedObject> detected_objects = detect_object(test_image, forest);
+            // cout << detected_objects.size() << endl;
+            // visualize_detected_objects(detected_objects, test_image.clone());
 
-        vector<DetectedObject> non_suppressed = non_maximum_supression(detected_objects, 0.5);
-        std::cout << "max_suppression done" << std::endl;
-        // cout << non_suppressed.size() << endl;
-        // visualize_detected_objects(non_suppressed, test_image.clone());
+            vector<DetectedObject> non_suppressed = non_maximum_supression(detected_objects, 0.5);
+            std::cout << "max_suppression done" << std::endl;
+            // cout << non_suppressed.size() << endl;
+            // visualize_detected_objects(non_suppressed, test_image.clone());
 
-        non_suppressed = filter_highest_confidence(non_suppressed);
+            non_suppressed = filter_highest_confidence(non_suppressed);
 
-        Mat result = visualize_detected_objects(non_suppressed, test_image.clone(), false);
-        save_result(result, non_suppressed, image_num);
+            Mat result = visualize_detected_objects(non_suppressed, test_image.clone(), false);
+            save_result(result, non_suppressed, image_num);
 
-        results.push_back(non_suppressed);
-        // break;
+            results.push_back(non_suppressed);
+            // break;
+        }
+    } else {
+        results = load_results("results");
     }
 
     // do the comparison to the GT.
