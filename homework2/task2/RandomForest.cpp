@@ -28,7 +28,6 @@ RandomForest::~RandomForest()
 
 void RandomForest::setTreeCount(int treeCount)
 {
-    // Fill
     for (cv::Ptr<cv::ml::DTrees> dtrees : mTrees) {
         delete dtrees;
     }
@@ -54,7 +53,6 @@ void RandomForest::setMaxDepth(int maxDepth)
 
 void RandomForest::setCVFolds(int cvFols)
 {
-    // Fill
     mCVFolds = cvFols;
     for(uint treeIdx=0; treeIdx<mTreeCount; treeIdx++)
         mTrees[treeIdx]->setCVFolds(mCVFolds);
@@ -62,7 +60,6 @@ void RandomForest::setCVFolds(int cvFols)
 
 void RandomForest::setMinSampleCount(int minSampleCount)
 {
-    // Fill
     mMinSampleCount = minSampleCount;
     for(uint treeIdx=0; treeIdx<mTreeCount; treeIdx++)
         mTrees[treeIdx]->setMinSampleCount(mMinSampleCount);
@@ -70,7 +67,6 @@ void RandomForest::setMinSampleCount(int minSampleCount)
 
 void RandomForest::setMaxCategories(int maxCategories)
 {
-    // Fill
     mMaxCategories = maxCategories;
     for(uint treeIdx=0; treeIdx<mTreeCount; treeIdx++)
         mTrees[treeIdx]->setMaxCategories(mMaxCategories);
@@ -88,8 +84,6 @@ std::vector<double> RandomForest::getConfidences() const
 
 void RandomForest::train(const cv::Ptr<cv::ml::TrainData>& train_data)
 {
-    // Fill
-    // TODO: what is a good value? Is this the expected amount of inliers?
     double train_frac = 0.5;
     int total_samples = train_data->getNTrainSamples();
     int num_train = train_frac*total_samples;

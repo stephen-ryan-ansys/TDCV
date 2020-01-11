@@ -104,7 +104,7 @@ void testForest(){
     Ptr<TrainData> test_data = generate_data("data/task2/test/", true);
     Ptr<RandomForest> forest = new RandomForest(5, 20, 0, 2, num_classes);
 
-    bool load = true;
+    bool load = false;
     if (load) {
         forest->load("model/task2/");
     }

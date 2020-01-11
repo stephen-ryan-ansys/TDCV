@@ -1,8 +1,5 @@
-
-
 #ifndef RF_RANDOMFOREST_H
 #define RF_RANDOMFOREST_H
-
 
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -12,7 +9,6 @@ class RandomForest
 public:
 	RandomForest();
 
-    // You can create the forest directly in the constructor or create an empty forest and use the below methods to populate it
 	RandomForest(int treeCount, int maxDepth, int CVFolds, int minSampleCount, int maxCategories);
     
     ~RandomForest();
@@ -31,7 +27,6 @@ public:
     void save(const cv::String &dirpath) const;
     void load(const cv::String &dirpath);
 
-    // float predict(/* Fill */);
     std::vector<int> predict(cv::InputArray samples);
 
     float calcError(cv::Ptr<cv::ml::TrainData>& data, bool test, cv::OutputArray resp);
