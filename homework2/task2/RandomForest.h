@@ -22,7 +22,9 @@ public:
     void setCVFolds(int cvFols);
     void setMinSampleCount(int minSampleCount);
     void setMaxCategories(int maxCategories);
-	
+
+    std::vector<int> getPredictions();
+    std::vector<double> getConfidences();
 
     void train(const cv::Ptr<cv::ml::TrainData>& train_data);
 
@@ -37,6 +39,9 @@ private:
 	int mCVFolds;
 	int mMinSampleCount;
 	int mMaxCategories;
+
+    std::vector<int> mPredictions;
+    std::vector<double> mConfidences;
 
     // M-Trees for constructing the forest
     std::vector<cv::Ptr<cv::ml::DTrees> > mTrees;

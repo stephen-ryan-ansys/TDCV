@@ -75,7 +75,15 @@ void RandomForest::setMaxCategories(int maxCategories)
         mTrees[treeIdx]->setMaxCategories(mMaxCategories);
 }
 
+std::vector<int> RandomForest::getPredictions()
+{
+    return mPredictions;
+}
 
+std::vector<double> RandomForest::getConfidences()
+{
+    return mConfidences;
+}
 
 void RandomForest::train(const cv::Ptr<cv::ml::TrainData>& train_data)
 {
@@ -99,10 +107,10 @@ void RandomForest::train(const cv::Ptr<cv::ml::TrainData>& train_data)
         cv::Mat samples_shuffled(num_train, samples.cols, samples.type());
         cv::Mat responses_shuffled(num_train, 1, responses.type());
 
-        for (int i = 0; i < num_train; i++) {
+        for (int j = 0; j < num_train; j++) {
             // need to be deep copies because of how opencv handles matrices
-            samples.row(shuffled[i]).copyTo(samples_shuffled.row(i));
-            responses.row(shuffled[i]).copyTo(responses_shuffled.row(i));
+            samples.row(shuffled[j]).copyTo(samples_shuffled.row(j));
+            responses.row(shuffled[j]).copyTo(responses_shuffled.row(j));
         }
         cv::Ptr<cv::ml::TrainData> train_data_shuffled(cv::ml::TrainData::create(samples_shuffled, cv::ml::ROW_SAMPLE, responses_shuffled));
 
@@ -121,6 +129,7 @@ std::vector<int> RandomForest::predict(cv::InputArray samples)
     }
 
     std::vector<int> predictions;
+    std::vector<double> confidences;
     for (int i = 0; i < samples.rows(); i++) {
         int final_prediction = -1;
         int max = -1;
@@ -134,9 +143,13 @@ std::vector<int> RandomForest::predict(cv::InputArray samples)
                 final_prediction = prediction;
             }
         }
+        double confidence = static_cast<double>(count[final_prediction])/mTreeCount;
 
+        confidences.push_back(confidence);
         predictions.push_back(final_prediction);
     }
+    mPredictions = predictions;
+    mConfidences = confidences;
 
     return predictions;
 }
