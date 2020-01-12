@@ -54,10 +54,13 @@ Ptr<TrainData> generate_data(string base_path) {
 }
 
 template<class ClassifierType>
-void performanceEval(cv::Ptr<ClassifierType> classifier, cv::Ptr<cv::ml::TrainData> data) {
-    classifier->train(data);
+void performanceEval(cv::Ptr<ClassifierType> classifier, cv::Ptr<cv::ml::TrainData> train_data, cv::Ptr<cv::ml::TrainData> test_data) {
+    classifier->train(train_data);
 
-    printf("error: %f\n", classifier->calcError(data, false, noArray()) );
+    printf("Performance evaluation on training data\n");
+    printf("error: %f\n", classifier->calcError(train_data, false, noArray()) );
+    printf("Performance evaluation on test data\n");
+    printf("error: %f\n", classifier->calcError(test_data, false, noArray()) );
 };
 
 void testDTrees() {
@@ -80,12 +83,7 @@ void testDTrees() {
     tree->setMaxDepth(20);
     tree->setMinSampleCount(2);
 
-    printf("Performance evaluation on training data\n");
-    performanceEval<cv::ml::DTrees>(tree, train_data);
-
-    printf("Performance evaluation on test data\n");
-    performanceEval<cv::ml::DTrees>(tree, test_data);
-
+    performanceEval<cv::ml::DTrees>(tree, train_data, test_data);
 }
 
 void testForest(){
@@ -105,10 +103,7 @@ void testForest(){
 
     Ptr<RandomForest> forest = new RandomForest(5, 20, 0, 2, num_classes);
 
-    printf("Performance evaluation on training data\n");
-    performanceEval<RandomForest>(forest, train_data);
-    printf("Performance evaluation on test data\n");
-    performanceEval<RandomForest>(forest, test_data);
+    performanceEval<RandomForest>(forest, train_data, test_data);
 }
 
 int main() {
