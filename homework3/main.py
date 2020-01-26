@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import tensorflow as tf
 import pathlib
@@ -35,7 +37,8 @@ def get_pose_map(path):
 def get_image(path):
     image = tf.io.read_file(path)
     image = tf.image.decode_png(image, channels=3)
-    image = tf.image.convert_image_dtype(image, tf.float32)
+    image = tf.cast(image, tf.float32)
+    image = tf.image.per_image_standardization(image)
     return image
 
 def get_data(folder_path):
@@ -85,26 +88,22 @@ def combine(a, b):
 
     return a
 
-def is_equal(a, b):
-    eps = 1e-6
-    return np.abs(a - b) < eps
-
 def qw_distance(q1, q2):
     dot = np.dot(q1, q2)
     # Sometimes it's 1.0000000000000002 ¯\_(ツ)_/¯
-    if (is_equal(dot, 1)):
-        dot = 1
+    if (np.isclose(dot, 1.)):
+        dot = 1.
 
     return 2 * np.arccos(np.abs(dot))
 
 def find_puller(anchor, s_db):
     label = anchor['label']
-    mini = -1
+    mini = float('inf')
     for candidate in s_db[label]:
         q1 = anchor['pose']
         q2 = candidate['pose']
         distance = qw_distance(q1, q2)
-        if (mini == -1 or mini > distance):
+        if (mini > distance):
             puller = candidate
             mini = distance
 
@@ -112,16 +111,23 @@ def find_puller(anchor, s_db):
 
 def find_pusher(anchor, s_db):
     label = anchor['label']
-    for key in s_db:
-        if (key != label):
-            return s_db[key][np.random.randint(len(s_db))]
+    if np.random.rand() < 0.5:
+        # choose a pusher with same object, random different pose
+        pusher = s_db[label][np.random.randint(len(s_db))]
+        # keep choosing again if they are the same pose, just in case
+        while(np.all(np.isclose(pusher['pose'], anchor['pose']))):
+            pusher = s_db[label][np.random.randint(len(s_db))]
+        return pusher
+    else:
+        # choose a pusher of a random different object
+        choices = [key for key in s_db if key != label]
+        key = np.random.choice(choices)
+        return s_db[key][np.random.randint(len(s_db))]
 
 def generate_batch(s_train, s_db, batch_size):
     flat = np.array([s_train[key] for key in s_train]).flatten()
 
-    chosen = np.arange(len(flat))
-    np.random.shuffle(chosen)
-    chosen = chosen[0:batch_size]
+    chosen = np.random.choice(len(flat), batch_size)
 
     triplets = []
 
