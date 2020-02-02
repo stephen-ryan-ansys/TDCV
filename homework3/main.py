@@ -53,7 +53,7 @@ def get_data(folder_path):
         for d in image_data:
             file_name = str(d.numpy().decode('UTF-8')).split('/')[-1]
 
-            image = get_image(d)
+            image = lambda : get_image(d)
             pose = pose_map[file_name]
 
             label_data.append({
@@ -152,3 +152,23 @@ s_train = combine(s_fine, s_subtrain)
 batch = generate_batch(s_train, s_db, 100)
 
 print(len(batch))
+
+model = tf.keras.models.Sequential([
+    tf.keras.layers.Conv2D(filters=16, kernel_size=(8,8), activation='relu', input_shape=(64,64,3)),
+    tf.keras.layers.MaxPool2D(),
+
+    tf.keras.layers.Conv2D(filters=7, kernel_size=(5,5), activation='relu'),
+    tf.keras.layers.MaxPool2D(),
+
+    tf.keras.layers.Flatten(),
+
+    tf.keras.layers.Dense(units=256, activation='relu'),
+
+    tf.keras.layers.Dense(units=16, activation='softmax')
+])
+
+tf.reduce_min()
+with tf.Session() as sess:
+    writer = tf.summary.FileWriter("output", sess.graph)
+    print(sess.run(model))
+    writer.close()
