@@ -5,6 +5,7 @@ import tensorflow as tf
 import pathlib
 import re
 import warnings
+import time
 
 warnings.filterwarnings("error")
 data_dir = pathlib.Path.cwd()
@@ -50,7 +51,7 @@ def get_data(folder_path):
         pose_map = get_pose_map(str(data_dir/(folder_path + '/' + label + '/poses.txt')))
 
         label_data = []
-        for d in image_data:
+        for d in image_data.take(-1):
             file_name = str(d.numpy().decode('UTF-8')).split('/')[-1]
 
             image = lambda : get_image(d)
@@ -59,9 +60,11 @@ def get_data(folder_path):
             label_data.append({
                 'image': image,
                 'pose': pose,
-                'label': label
+                'label': label,
+                'name': file_name
             })
 
+        label_data.sort(key=lambda f: int(re.sub('\D', '', f['name'])))
         data[label] = np.array(label_data)
 
     return data
@@ -69,7 +72,11 @@ def get_data(folder_path):
 def split(s_real):
     with open(str(data_dir/('data/real/training_split.txt'))) as f:
         indices = np.array(f.readline().strip().split(', ')).astype(np.int)
-    print(len(indices))
+    
+    # print(s_real)
+    # n_s_real = len(next(iter(s_real.values())))
+    # n_subtrain = len(indices)
+    # print("Train split: {}, Test split: {}".format(n_subtrain, n_s_real - n_subtrain))
 
     s_subtrain = {}
     s_test = {}
@@ -80,6 +87,7 @@ def split(s_real):
         mask[indices] = 0
         s_test[label] = s_real[label][mask]
 
+    # print(s_subtrain)
     return s_subtrain, s_test
 
 def combine(a, b):
@@ -144,28 +152,44 @@ def generate_batch(s_train, s_db, batch_size):
     return np.array(triplets)
 
 
+def loss_func(model, x):
+    m = 0.01
+
+    x_a = tf.convert_to_tensor([x_i['anchor']['image']() for x_i in x])
+    x_pull = tf.convert_to_tensor([x_i['puller']['image']() for x_i in x])
+    x_push = tf.convert_to_tensor([x_i['pusher']['image']() for x_i in x])
+
+    y_a = model(x_a)
+    y_pull = model(x_pull)
+    y_push = model(x_push)
+
+    square_diff_pos = tf.math.squared_difference(y_a, y_pull)
+    square_diff_neg = tf.math.squared_difference(y_a, y_push)
+    # print(square_diff_pos)
+    dist_pos = tf.reduce_sum(square_diff_pos, axis=1)
+    dist_neg = tf.reduce_sum(square_diff_neg, axis=1)
+
+    loss_triplets = tf.reduce_sum(tf.maximum(0., 1. - dist_neg/(dist_pos + m)))
+    loss_pairs = tf.reduce_sum(dist_neg)
+    loss = loss_triplets + loss_pairs
+
+    # print("L_t: {}, L_p: {}, L: {}".format(loss_triplets, loss_pairs, loss))
+    return loss
+
+
+def grad(model, x):
+    with tf.GradientTape() as tape:
+        loss_value = loss_func(model, x)
+
+    return loss_value, tape.gradient(loss_value, model.trainable_variables)
+
+
 s_db = get_data('data/coarse')
 s_fine = get_data('data/fine')
 s_subtrain, s_test = split(get_data('data/real'))
 s_train = combine(s_fine, s_subtrain)
 
 batch = generate_batch(s_train, s_db, 100)
-
-print(len(batch))
-
-def loss_func(feats):
-    m = 0.1
-
-    diff_pos = feats[0:batch_size:3] - feats[1:batch_size:3]
-    diff_neg = feats[0:batch_size:3] - feats[2:batch_size:3]
-    square_diff_pos = tf.square(diff_pos)
-    square_diff_neg = tf.square(diff_neg)
-
-    loss_triplets = tf.reduce_sum(tf.maximum(0., 1. - square_diff_neg/(square_diff_pos + m)))
-    loss_pairs = tf.reduce_sum(square_diff_pos)
-    loss = loss_triplets + loss_pairs
-
-    return loss
 
 model = tf.keras.models.Sequential([
     tf.keras.layers.Conv2D(filters=16, kernel_size=(8,8), activation='relu', input_shape=(64,64,3)),
@@ -181,8 +205,44 @@ model = tf.keras.models.Sequential([
     tf.keras.layers.Dense(units=16, activation='softmax')
 ])
 
-tf.reduce_min()
-with tf.Session() as sess:
-    writer = tf.summary.FileWriter("output", sess.graph)
-    print(sess.run(model))
-    writer.close()
+# Testing
+# batch = generate_batch(s_train, s_db, 10)
+# loss(model, batch)
+# exit()
+
+# Train
+## Note: Rerunning this cell uses the same model variables
+
+# Keep results for plotting
+train_loss_results = []
+train_accuracy_results = []
+
+batch_size = 30
+num_epochs = 100
+optimizer = tf.keras.optimizers.Adam()
+
+for epoch in range(num_epochs):
+    epoch_loss_avg = tf.keras.metrics.Mean()
+    epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
+
+    batch = generate_batch(s_train, s_db, batch_size)
+    # loss_value, grads = grad(model, batch)
+    # epoch_loss_avg(loss_value)
+
+    for x in batch:
+        # Optimize the model
+        loss_value, grads = grad(model, np.array([x])) # Make it 1-D tensor
+        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+
+        # Track progress
+        epoch_loss_avg(loss_value)  # Add current batch loss
+
+        # TODO define accuracy
+        # epoch_accuracy(y, model(x, training=True))
+
+    # End epoch
+    train_loss_results.append(epoch_loss_avg.result())
+    train_accuracy_results.append(epoch_accuracy.result())
+
+    # if epoch % 50 == 0:
+    print("Epoch {:03d}: Loss: {}, Accuracy: {}".format(epoch, epoch_loss_avg.result(), epoch_accuracy.result()))
