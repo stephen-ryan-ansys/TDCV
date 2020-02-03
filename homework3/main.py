@@ -6,6 +6,7 @@ import pathlib
 import re
 import warnings
 import time
+import cv2 as cv
 
 warnings.filterwarnings("error")
 data_dir = pathlib.Path.cwd()
@@ -184,6 +185,39 @@ def grad(model, x):
     return loss_value, tape.gradient(loss_value, model.trainable_variables)
 
 
+# Load the image into memory
+def unpack(s):
+    return [{'image': value['image'](), 'label': value['label'], 'pose': value['pose'], 'name': value['name']} for values in s.values() for value in values]
+
+
+def evaluate(model, test_data, db_data):
+    test_images = tf.convert_to_tensor([x['image'] for x in test_data])
+    db_images = tf.convert_to_tensor([x['image'] for x in db_data])
+
+    db_feats = model(db_images).numpy().astype(np.float32)
+    # print(db_feats.shape)
+
+    db_responses = np.arange(len(db_feats)).astype(np.float32)
+    # print(db_responses.shape)
+
+    knn = cv.ml.KNearest_create()
+    knn.train(db_feats, cv.ml.ROW_SAMPLE, db_responses)
+
+    test_feats = model(test_images).numpy().astype(np.float32)
+    ret, results, neighbours, dist = knn.findNearest(test_feats, 1)
+
+    correct = 0.
+    for i, result in enumerate(results):
+        idx = int(result[0])
+        label = db_data[idx]['label']
+        gt_label = test_data[i]['label']
+        if label == gt_label:
+            correct = correct + 1
+
+    acc = correct / len(results)
+    return acc
+
+
 s_db = get_data('data/coarse')
 s_fine = get_data('data/fine')
 s_subtrain, s_test = split(get_data('data/real'))
@@ -210,39 +244,65 @@ model = tf.keras.models.Sequential([
 # loss(model, batch)
 # exit()
 
-# Train
-## Note: Rerunning this cell uses the same model variables
+# Pre compute test and db features
+print('Loading test and db features...')
+test_data = unpack(s_test)
+db_data = unpack(s_db)
+print('Done loading features.')
 
-# Keep results for plotting
-train_loss_results = []
-train_accuracy_results = []
+tc = tf.keras.callbacks.TensorBoard()
+tc.set_model(model)
 
-batch_size = 30
-num_epochs = 100
-optimizer = tf.keras.optimizers.Adam()
+load = 0
 
-for epoch in range(num_epochs):
-    epoch_loss_avg = tf.keras.metrics.Mean()
-    epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
+if load == 1:
+    # Load
+    model.load_weights('weights')
+else:
+    # Train
 
-    batch = generate_batch(s_train, s_db, batch_size)
-    # loss_value, grads = grad(model, batch)
-    # epoch_loss_avg(loss_value)
+    # Keep results for plotting
+    train_loss_results = []
+    train_accuracy_results = []
 
-    for x in batch:
-        # Optimize the model
-        loss_value, grads = grad(model, np.array([x])) # Make it 1-D tensor
+    batch_size = 30
+    num_epochs = 3000
+    optimizer = tf.keras.optimizers.Adam()
+
+    for epoch in range(num_epochs):
+        epoch_loss_avg = tf.keras.metrics.Mean()
+        epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
+
+        batch = generate_batch(s_train, s_db, batch_size)
+
+        loss_value, grads = grad(model, batch)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
+        epoch_loss_avg(loss_value)
 
-        # Track progress
-        epoch_loss_avg(loss_value)  # Add current batch loss
+        # for x in batch:
+        #     # Optimize the model
+        #     loss_value, grads = grad(model, np.array([x])) # Make it 1-D tensor
+        #     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        # TODO define accuracy
-        # epoch_accuracy(y, model(x, training=True))
+        #     # Track progress
+        #     epoch_loss_avg(loss_value)  # Add current batch loss
 
-    # End epoch
-    train_loss_results.append(epoch_loss_avg.result())
-    train_accuracy_results.append(epoch_accuracy.result())
+        #     # TODO define accuracy
+        #     # epoch_accuracy(y, model(x, training=True))
 
-    # if epoch % 50 == 0:
-    print("Epoch {:03d}: Loss: {}, Accuracy: {}".format(epoch, epoch_loss_avg.result(), epoch_accuracy.result()))
+        # End epoch
+        train_loss_results.append(epoch_loss_avg.result())
+        train_accuracy_results.append(epoch_accuracy.result())
+
+        # if epoch % 50 == 0:
+        print("Epoch {:03d}: Loss: {}, Accuracy: {}".format(epoch, epoch_loss_avg.result(), epoch_accuracy.result()))
+
+        if epoch % 10 == 0:
+            # Evaluate s_test
+            acc = evaluate(model, test_data, db_data)
+
+        logs = {'loss': loss_value, 'acc': acc}
+        tc.on_epoch_end(epoch, logs)
+
+    model.save_weights('weights')
+    tc.on_train_end('_')
