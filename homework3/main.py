@@ -259,6 +259,7 @@ def plot_hist(model, test_data, db_data, epoch):
     plt.xlabel('Angle tolerance')
     plt.ylabel('%')
     plt.savefig("hist-{}.png".format(epoch))
+    plt.clf()
     # plt.show()
 
 
@@ -309,7 +310,7 @@ else:
     train_accuracy_results = []
 
     batch_size = 15
-    num_epochs = 10000
+    num_epochs = 20000
     optimizer = tf.keras.optimizers.Adam()
 
     for epoch in range(num_epochs):
