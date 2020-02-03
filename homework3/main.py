@@ -153,6 +153,20 @@ batch = generate_batch(s_train, s_db, 100)
 
 print(len(batch))
 
+def loss_func(feats):
+    m = 0.1
+
+    diff_pos = feats[0:batch_size:3] - feats[1:batch_size:3]
+    diff_neg = feats[0:batch_size:3] - feats[2:batch_size:3]
+    square_diff_pos = tf.square(diff_pos)
+    square_diff_neg = tf.square(diff_neg)
+
+    loss_triplets = tf.reduce_sum(tf.maximum(0., 1. - square_diff_neg/(square_diff_pos + m)))
+    loss_pairs = tf.reduce_sum(square_diff_pos)
+    loss = loss_triplets + loss_pairs
+
+    return loss
+
 model = tf.keras.models.Sequential([
     tf.keras.layers.Conv2D(filters=16, kernel_size=(8,8), activation='relu', input_shape=(64,64,3)),
     tf.keras.layers.MaxPool2D(),
