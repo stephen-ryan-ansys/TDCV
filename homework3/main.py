@@ -7,6 +7,7 @@ import re
 import warnings
 import time
 import cv2 as cv
+import matplotlib.pyplot as plt
 
 warnings.filterwarnings("error")
 data_dir = pathlib.Path.cwd()
@@ -36,12 +37,14 @@ def get_pose_map(path):
 
     return pose_map
 
+
 def get_image(path):
     image = tf.io.read_file(path)
     image = tf.image.decode_png(image, channels=3)
     image = tf.cast(image, tf.float32)
     image = tf.image.per_image_standardization(image)
     return image
+
 
 def get_data(folder_path):
     data = {}
@@ -55,7 +58,7 @@ def get_data(folder_path):
         for d in image_data.take(-1):
             file_name = str(d.numpy().decode('UTF-8')).split('/')[-1]
 
-            image = lambda : get_image(d)
+            image = lambda d=d: get_image(d)
             pose = pose_map[file_name]
 
             label_data.append({
@@ -69,6 +72,7 @@ def get_data(folder_path):
         data[label] = np.array(label_data)
 
     return data
+
 
 def split(s_real):
     with open(str(data_dir/('data/real/training_split.txt'))) as f:
@@ -91,11 +95,13 @@ def split(s_real):
     # print(s_subtrain)
     return s_subtrain, s_test
 
+
 def combine(a, b):
     for label in labels:
         a[label] = np.append(a[label], b[label])
 
     return a
+
 
 def qw_distance(q1, q2):
     dot = np.dot(q1, q2)
@@ -104,6 +110,7 @@ def qw_distance(q1, q2):
         dot = 1.
 
     return 2 * np.arccos(np.abs(dot))
+
 
 def find_puller(anchor, s_db):
     label = anchor['label']
@@ -117,6 +124,7 @@ def find_puller(anchor, s_db):
             mini = distance
 
     return puller
+
 
 def find_pusher(anchor, s_db):
     label = anchor['label']
@@ -132,6 +140,7 @@ def find_pusher(anchor, s_db):
         choices = [key for key in s_db if key != label]
         key = np.random.choice(choices)
         return s_db[key][np.random.randint(len(s_db))]
+
 
 def generate_batch(s_train, s_db, batch_size):
     flat = np.array([s_train[key] for key in s_train]).flatten()
@@ -153,12 +162,31 @@ def generate_batch(s_train, s_db, batch_size):
     return np.array(triplets)
 
 
+def visualize(x_a, x_pull, x_push):
+    for i in range(len(x_a)):
+        im_a = x_a[i]
+        im_pull = x_pull[i]
+        im_push = x_push[i]
+
+        fig = plt.figure(figsize=(1, 3))
+        fig.add_subplot(1, 3, 1)
+        plt.imshow(im_a)
+
+        fig.add_subplot(1, 3, 2)
+        plt.imshow(im_pull)
+
+        fig.add_subplot(1, 3, 3)
+        plt.imshow(im_push)
+        plt.show()
+
+
 def loss_func(model, x):
     m = 0.01
 
     x_a = tf.convert_to_tensor([x_i['anchor']['image']() for x_i in x])
     x_pull = tf.convert_to_tensor([x_i['puller']['image']() for x_i in x])
     x_push = tf.convert_to_tensor([x_i['pusher']['image']() for x_i in x])
+    # visualize(x_a, x_pull, x_push)
 
     y_a = model(x_a)
     y_pull = model(x_pull)
@@ -223,8 +251,6 @@ s_fine = get_data('data/fine')
 s_subtrain, s_test = split(get_data('data/real'))
 s_train = combine(s_fine, s_subtrain)
 
-batch = generate_batch(s_train, s_db, 100)
-
 model = tf.keras.models.Sequential([
     tf.keras.layers.Conv2D(filters=16, kernel_size=(8,8), activation='relu', input_shape=(64,64,3)),
     tf.keras.layers.MaxPool2D(),
@@ -240,8 +266,9 @@ model = tf.keras.models.Sequential([
 ])
 
 # Testing
-# batch = generate_batch(s_train, s_db, 10)
-# loss(model, batch)
+# batch = generate_batch(s_train, s_db, 5)
+# print(batch)
+# loss_func(model, batch)
 # exit()
 
 # Pre compute test and db features
