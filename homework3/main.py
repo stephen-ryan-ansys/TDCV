@@ -259,7 +259,7 @@ def plot_hist(model, test_data, db_data, epoch):
     plt.xlabel('Angle tolerance')
     plt.ylabel('%')
     plt.savefig("hist-{}.png".format(epoch))
-    plt.show()
+    # plt.show()
 
 
 s_db = get_data('data/coarse')
