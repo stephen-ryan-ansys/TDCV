@@ -218,7 +218,7 @@ def unpack(s):
     return [{'image': value['image'](), 'label': value['label'], 'pose': value['pose'], 'name': value['name']} for values in s.values() for value in values]
 
 
-def evaluate(model, test_data, db_data):
+def plot_hist(model, test_data, db_data, epoch):
     test_images = tf.convert_to_tensor([x['image'] for x in test_data])
     db_images = tf.convert_to_tensor([x['image'] for x in db_data])
 
@@ -235,15 +235,31 @@ def evaluate(model, test_data, db_data):
     ret, results, neighbours, dist = knn.findNearest(test_feats, 1)
 
     correct = 0.
+    w = [0, 0, 0, 0]
     for i, result in enumerate(results):
         idx = int(result[0])
         label = db_data[idx]['label']
         gt_label = test_data[i]['label']
         if label == gt_label:
-            correct = correct + 1
+            pose1 = db_data[idx]['pose']
+            pose2 = test_data[i]['pose']
+            dist = qw_distance(pose1, pose2)
+            if dist < 10:
+                w[0] = w[0] + 1
+            if dist < 20:
+                w[1] = w[1] + 1
+            if dist < 40:
+                w[2] = w[2] + 1
+            if dist < 180:
+                w[3] = w[3] + 1
 
-    acc = correct / len(results)
-    return acc
+    w = [[x * 100. / len(results)] for x in w]
+    data = [[9], [19], [39], [179]]
+    plt.hist(data, weights=w, bins=[0, 10, 20, 40, 180], histtype='stepfilled')
+    plt.xlabel('Angle tolerance')
+    plt.ylabel('%')
+    plt.savefig("hist-{}.png".format(epoch))
+    plt.show()
 
 
 s_db = get_data('data/coarse')
@@ -292,44 +308,24 @@ else:
     train_loss_results = []
     train_accuracy_results = []
 
-    batch_size = 30
-    num_epochs = 3000
+    batch_size = 15
+    num_epochs = 10000
     optimizer = tf.keras.optimizers.Adam()
 
     for epoch in range(num_epochs):
-        epoch_loss_avg = tf.keras.metrics.Mean()
-        epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
-
         batch = generate_batch(s_train, s_db, batch_size)
 
         loss_value, grads = grad(model, batch)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
-        epoch_loss_avg(loss_value)
 
-        # for x in batch:
-        #     # Optimize the model
-        #     loss_value, grads = grad(model, np.array([x])) # Make it 1-D tensor
-        #     optimizer.apply_gradients(zip(grads, model.trainable_variables))
+        if (epoch+1) % 10 == 0:
+            print("Epoch {:03d}: Loss: {}".format(epoch, loss_value))
+            logs = {'loss': loss_value }
+            tc.on_epoch_end(epoch, logs)
 
-        #     # Track progress
-        #     epoch_loss_avg(loss_value)  # Add current batch loss
+        if (epoch+1) % 100 == 0:
+            plot_hist(model, test_data, db_data, epoch)
 
-        #     # TODO define accuracy
-        #     # epoch_accuracy(y, model(x, training=True))
-
-        # End epoch
-        train_loss_results.append(epoch_loss_avg.result())
-        train_accuracy_results.append(epoch_accuracy.result())
-
-        # if epoch % 50 == 0:
-        print("Epoch {:03d}: Loss: {}, Accuracy: {}".format(epoch, epoch_loss_avg.result(), epoch_accuracy.result()))
-
-        if epoch % 10 == 0:
-            # Evaluate s_test
-            acc = evaluate(model, test_data, db_data)
-
-        logs = {'loss': loss_value, 'acc': acc}
-        tc.on_epoch_end(epoch, logs)
 
     model.save_weights('weights')
     tc.on_train_end('_')
