@@ -9,10 +9,12 @@ import time
 import cv2 as cv
 import matplotlib.pyplot as plt
 from pyquaternion import Quaternion
+import seaborn as sn
 
 warnings.filterwarnings("error")
 data_dir = pathlib.Path.cwd()
 labels = ['ape', 'benchvise', 'cam', 'cat', 'duck']
+label_index = {'ape': 0, 'benchvise': 1, 'cam': 2, 'cat': 3, 'duck': 4}
 
 def get_pose_map(path):
     pose_map = {}
@@ -200,7 +202,7 @@ def loss_func(model, x):
     dist_neg = tf.reduce_sum(square_diff_neg, axis=1)
 
     loss_triplets = tf.reduce_sum(tf.maximum(0., 1. - dist_neg/(dist_pos + m)))
-    loss_pairs = tf.reduce_sum(dist_neg)
+    loss_pairs = tf.reduce_sum(dist_pos)
     loss = loss_triplets + loss_pairs
 
     # print("L_t: {}, L_p: {}, L: {}".format(loss_triplets, loss_pairs, loss))
@@ -235,25 +237,25 @@ def angle_diff(q1, q2):
     return deg
 
 
-def plot_hist(model, test_data, db_data, test_image, db_images, epoch):
+def plot_hist(model, test_data, db_data, test_images, db_images, epoch):
     db_feats = model(db_images).numpy().astype(np.float32)
-    # print(db_feats.shape)
-
     db_responses = np.arange(len(db_feats)).astype(np.float32)
-    # print(db_responses.shape)
+    test_feats = model(test_images).numpy().astype(np.float32)
 
     knn = cv.ml.KNearest_create()
     knn.train(db_feats, cv.ml.ROW_SAMPLE, db_responses)
-
-    test_feats = model(test_images).numpy().astype(np.float32)
     ret, results, neighbours, dist = knn.findNearest(test_feats, 1)
 
+    confusion_matrix = np.zeros((len(labels), len(labels)), dtype=int)
+    x = [0, 0, 0, 0, 0]
     correct = 0.
     w = [0, 0, 0, 0]
     for i, result in enumerate(results):
         idx = int(result[0])
         label = db_data[idx]['label']
         gt_label = test_data[i]['label']
+        x[label_index[label]] = x[label_index[label]] + 1
+
         if label == gt_label:
             pose1 = db_data[idx]['pose']
             pose2 = test_data[i]['pose']
@@ -267,6 +269,16 @@ def plot_hist(model, test_data, db_data, test_image, db_images, epoch):
             if dist < 180:
                 w[3] = w[3] + 1
 
+        row_index = label_index[gt_label]
+        col_index = label_index[label]
+        confusion_matrix[row_index][col_index] = confusion_matrix[row_index][col_index] + 1
+
+    # print(x)
+    sn.set(font_scale=1.4) # for label size
+    sn.heatmap(confusion_matrix / len(results), annot=True, annot_kws={"size": 16}) # font size
+    plt.savefig("conf-{}.png".format(epoch))
+    plt.clf()
+
     w = [[x * 100. / len(results)] for x in w]
     data = [[9], [19], [39], [179]]
     plt.hist(data, weights=w, bins=[0, 10, 20, 40, 180], histtype='stepfilled')
@@ -274,7 +286,6 @@ def plot_hist(model, test_data, db_data, test_image, db_images, epoch):
     plt.ylabel('%')
     plt.savefig("hist-{}.png".format(epoch))
     plt.clf()
-    # plt.show()
 
 
 def save_epoch(epoch):
@@ -306,12 +317,6 @@ model = tf.keras.models.Sequential([
     tf.keras.layers.Dense(units=16, activation='softmax')
 ])
 
-# Testing
-# batch = generate_batch(s_train, s_db, 5)
-# print(batch)
-# loss_func(model, batch)
-# exit()
-
 # Pre compute test and db features
 print('Loading test and db features...')
 test_data = unpack(s_test)
@@ -325,11 +330,11 @@ tc.set_model(model)
 tm = tf.keras.callbacks.ModelCheckpoint('logs/weights', save_weights_only=True)
 tm.set_model(model)
 
-batch_size = 30
+batch_size = 15
 num_epochs = 50000
 optimizer = tf.keras.optimizers.Adam()
 
-load = 1
+load = 0
 init_epoch = 0
 
 if load == 1:
@@ -337,6 +342,10 @@ if load == 1:
     print("Loading weight from last epoch.")
     model.load_weights('logs/weights')
     init_epoch = load_epoch()
+
+# Testing
+# plot_hist(model, test_data, db_data, test_images, db_images, 999999)
+# exit()
 
 # Train
 for epoch in range(init_epoch, num_epochs):
