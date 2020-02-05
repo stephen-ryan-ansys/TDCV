@@ -235,10 +235,7 @@ def angle_diff(q1, q2):
     return deg
 
 
-def plot_hist(model, test_data, db_data, epoch):
-    test_images = tf.convert_to_tensor([x['image'] for x in test_data])
-    db_images = tf.convert_to_tensor([x['image'] for x in db_data])
-
+def plot_hist(model, test_data, db_data, test_image, db_images, epoch):
     db_feats = model(db_images).numpy().astype(np.float32)
     # print(db_feats.shape)
 
@@ -280,6 +277,16 @@ def plot_hist(model, test_data, db_data, epoch):
     # plt.show()
 
 
+def save_epoch(epoch):
+    with open('logs/epoch.txt', 'w') as f:
+        f.write('%d' % epoch)
+
+
+def load_epoch():
+    with open('logs/epoch.txt', 'r') as f:
+        return int(f.readline().strip())
+
+
 s_db = get_data('data/coarse')
 s_fine = get_data('data/fine')
 s_subtrain, s_test = split(get_data('data/real'))
@@ -309,41 +316,43 @@ model = tf.keras.models.Sequential([
 print('Loading test and db features...')
 test_data = unpack(s_test)
 db_data = unpack(s_db)
+test_images = tf.convert_to_tensor([x['image'] for x in test_data])
+db_images = tf.convert_to_tensor([x['image'] for x in db_data])
 print('Done loading features.')
 
 tc = tf.keras.callbacks.TensorBoard()
 tc.set_model(model)
+tm = tf.keras.callbacks.ModelCheckpoint('logs/weights', save_weights_only=True)
+tm.set_model(model)
 
-load = 0
+batch_size = 30
+num_epochs = 50000
+optimizer = tf.keras.optimizers.Adam()
+
+load = 1
+init_epoch = 0
 
 if load == 1:
     # Load
-    model.load_weights('weights')
-else:
-    # Train
+    print("Loading weight from last epoch.")
+    model.load_weights('logs/weights')
+    init_epoch = load_epoch()
 
-    # Keep results for plotting
-    train_loss_results = []
-    train_accuracy_results = []
+# Train
+for epoch in range(init_epoch, num_epochs):
+    batch = generate_batch(s_train, s_db, batch_size)
 
-    batch_size = 15
-    num_epochs = 50000
-    optimizer = tf.keras.optimizers.Adam()
+    loss_value, grads = grad(model, batch)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-    for epoch in range(num_epochs):
-        batch = generate_batch(s_train, s_db, batch_size)
+    if (epoch) % 10 == 0:
+        print("Epoch {:03d}: Loss: {}".format(epoch, loss_value))
+        logs = {'loss': loss_value }
+        tc.on_epoch_end(epoch, logs)
+        tm.on_epoch_end(epoch)
+        save_epoch(epoch)
 
-        loss_value, grads = grad(model, batch)
-        optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    if (epoch) % 1000 == 0:
+        plot_hist(model, test_data, db_data, test_images, db_images, epoch)
 
-        if (epoch) % 10 == 0:
-            print("Epoch {:03d}: Loss: {}".format(epoch, loss_value))
-            logs = {'loss': loss_value }
-            tc.on_epoch_end(epoch, logs)
-
-        if (epoch) % 1000 == 0:
-            plot_hist(model, test_data, db_data, epoch)
-
-
-    model.save_weights('weights')
-    tc.on_train_end('_')
+tc.on_train_end('_')
