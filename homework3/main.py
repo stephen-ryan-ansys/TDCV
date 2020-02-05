@@ -2,6 +2,7 @@
 
 import numpy as np
 import tensorflow as tf
+from tensorboard.plugins import projector
 import pathlib
 import re
 import warnings
@@ -287,6 +288,16 @@ def plot_hist(model, test_data, db_data, test_images, db_images, epoch):
     plt.savefig("hist-{}.png".format(epoch))
     plt.clf()
 
+    # save the test features for PCA:
+    config = projector.ProjectorConfig()
+    embedding = config.embeddings.add()
+    embedding.tensor_name = 'test_feats'
+    embedding.metadata_path = 'test_feats_meta.tsv'
+    projector.visualize_embeddings('logs', config)
+    tensor_embeddings = tf.Variable(test_feats, name='test_feats')
+    saver = tf.compat.v1.train.Saver([tensor_embeddings])
+    saver.save(sess=None, global_step=epoch, save_path='logs/test_feats.ckpt')
+
 
 def save_epoch(epoch):
     with open('logs/epoch.txt', 'w') as f:
@@ -334,7 +345,7 @@ batch_size = 15
 num_epochs = 50000
 optimizer = tf.keras.optimizers.Adam()
 
-load = 0
+load = 1
 init_epoch = 0
 
 if load == 1:
