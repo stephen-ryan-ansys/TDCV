@@ -8,6 +8,7 @@ import warnings
 import time
 import cv2 as cv
 import matplotlib.pyplot as plt
+from pyquaternion import Quaternion
 
 warnings.filterwarnings("error")
 data_dir = pathlib.Path.cwd()
@@ -218,6 +219,22 @@ def unpack(s):
     return [{'image': value['image'](), 'label': value['label'], 'pose': value['pose'], 'name': value['name']} for values in s.values() for value in values]
 
 
+def angle_diff(q1, q2):
+    a = Quaternion(q1)
+    b = Quaternion(q2)
+
+    q = a * b.conjugate
+    deg = abs(q.degrees)
+
+    if deg > 180. and np.isclose(deg, 180.):
+        deg = 180.
+
+    if deg > 180:
+        print('Angle greater than 180:', deg)
+
+    return deg
+
+
 def plot_hist(model, test_data, db_data, epoch):
     test_images = tf.convert_to_tensor([x['image'] for x in test_data])
     db_images = tf.convert_to_tensor([x['image'] for x in db_data])
@@ -243,7 +260,7 @@ def plot_hist(model, test_data, db_data, epoch):
         if label == gt_label:
             pose1 = db_data[idx]['pose']
             pose2 = test_data[i]['pose']
-            dist = qw_distance(pose1, pose2)
+            dist = angle_diff(pose1, pose2)
             if dist < 10:
                 w[0] = w[0] + 1
             if dist < 20:
@@ -310,7 +327,7 @@ else:
     train_accuracy_results = []
 
     batch_size = 15
-    num_epochs = 20000
+    num_epochs = 50000
     optimizer = tf.keras.optimizers.Adam()
 
     for epoch in range(num_epochs):
@@ -319,12 +336,12 @@ else:
         loss_value, grads = grad(model, batch)
         optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
-        if (epoch+1) % 10 == 0:
+        if (epoch) % 10 == 0:
             print("Epoch {:03d}: Loss: {}".format(epoch, loss_value))
             logs = {'loss': loss_value }
             tc.on_epoch_end(epoch, logs)
 
-        if (epoch+1) % 100 == 0:
+        if (epoch) % 1000 == 0:
             plot_hist(model, test_data, db_data, epoch)
 
 
